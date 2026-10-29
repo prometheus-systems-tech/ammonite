@@ -1,37 +1,37 @@
 #include <glib.h>
 
-#include <nautilus-file.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-metadata.h>
+#include <ammonite-file.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-metadata.h>
 
 static const char *TEST_FILE = "file:///etc/passwd";
-static const char *KEY_BOOL = NAUTILUS_METADATA_KEY_ICON_VIEW_SORT_REVERSED;
-static const char *KEY_STR = NAUTILUS_METADATA_KEY_ICON_VIEW_SORT_BY;
+static const char *KEY_BOOL = AMMONITE_METADATA_KEY_ICON_VIEW_SORT_REVERSED;
+static const char *KEY_STR = AMMONITE_METADATA_KEY_ICON_VIEW_SORT_BY;
 
 static void
 test_file_metadata_bool_set_true (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri (TEST_FILE);
-    nautilus_file_set_boolean_metadata (file, KEY_BOOL, TRUE);
-    g_assert_true (nautilus_file_get_boolean_metadata (file, KEY_BOOL, FALSE));
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri (TEST_FILE);
+    ammonite_file_set_boolean_metadata (file, KEY_BOOL, TRUE);
+    g_assert_true (ammonite_file_get_boolean_metadata (file, KEY_BOOL, FALSE));
 }
 
 static void
 test_file_metadata_bool_set_false (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri (TEST_FILE);
-    nautilus_file_set_boolean_metadata (file, KEY_BOOL, FALSE);
-    g_assert_false (nautilus_file_get_boolean_metadata (file, KEY_BOOL, TRUE));
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri (TEST_FILE);
+    ammonite_file_set_boolean_metadata (file, KEY_BOOL, FALSE);
+    g_assert_false (ammonite_file_get_boolean_metadata (file, KEY_BOOL, TRUE));
 }
 
 static void
 test_file_metadata_str_set (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri (TEST_FILE);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri (TEST_FILE);
 
-    nautilus_file_set_metadata (file, KEY_STR, NAUTILUS_METADATA_STRING, "value");
+    ammonite_file_set_metadata (file, KEY_STR, AMMONITE_METADATA_STRING, "value");
 
-    g_assert_cmpstr (nautilus_file_get_metadata (file, KEY_STR), ==, "value");
+    g_assert_cmpstr (ammonite_file_get_metadata (file, KEY_STR), ==, "value");
 }
 
 int
@@ -40,7 +40,7 @@ main (int   argc,
 {
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/file-metadata-set-bool/true",
                      test_file_metadata_bool_set_true);

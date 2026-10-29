@@ -13,10 +13,10 @@
 #include <gst/gst.h>
 
 #include "audio-video-properties-model.h"
-#include <nautilus-extension.h>
+#include <ammonite-extension.h>
 
 static GType tpp_type = 0;
-static void properties_model_provider_iface_init (NautilusPropertiesModelProviderInterface *iface);
+static void properties_model_provider_iface_init (AmmonitePropertiesModelProviderInterface *iface);
 
 static void
 audio_video_properties_plugin_register_type (GTypeModule *module)
@@ -46,7 +46,7 @@ audio_video_properties_plugin_register_type (GTypeModule *module)
                                             &info, 0);
     g_type_module_add_interface (module,
                                  tpp_type,
-                                 NAUTILUS_TYPE_PROPERTIES_MODEL_PROVIDER,
+                                 AMMONITE_TYPE_PROPERTIES_MODEL_PROVIDER,
                                  &properties_model_provider_iface_info);
 }
 
@@ -88,7 +88,7 @@ init_backend (gpointer data)
 }
 
 static GList *
-audio_video_properties_get_models (NautilusPropertiesModelProvider *provider,
+audio_video_properties_get_models (AmmonitePropertiesModelProvider *provider,
                                    GList                           *files)
 {
     /* only add properties model if a single file is selected */
@@ -97,8 +97,8 @@ audio_video_properties_get_models (NautilusPropertiesModelProvider *provider,
         return NULL;
     }
 
-    NautilusFileInfo *file_info = files->data;
-    g_autofree char *content_type = nautilus_file_info_get_mime_type (file_info);
+    AmmoniteFileInfo *file_info = files->data;
+    g_autofree char *content_type = ammonite_file_info_get_mime_type (file_info);
     g_autofree char *generic_icon_name = g_content_type_get_generic_icon_name (content_type);
 
     /* This model is for Audio/Video files */
@@ -110,7 +110,7 @@ audio_video_properties_get_models (NautilusPropertiesModelProvider *provider,
 
     /* okay, make the model, init'ing the backend first if necessary */
     static GOnce backend_inited = G_ONCE_INIT;
-    g_autofree char *uri = nautilus_file_info_get_uri (file_info);
+    g_autofree char *uri = ammonite_file_info_get_uri (file_info);
 
     g_once (&backend_inited, init_backend, NULL);
 
@@ -118,14 +118,14 @@ audio_video_properties_get_models (NautilusPropertiesModelProvider *provider,
 }
 
 static void
-properties_model_provider_iface_init (NautilusPropertiesModelProviderInterface *iface)
+properties_model_provider_iface_init (AmmonitePropertiesModelProviderInterface *iface)
 {
     iface->get_models = audio_video_properties_get_models;
 }
 
 /* --- extension interface --- */
 void
-nautilus_module_initialize (GTypeModule *module)
+ammonite_module_initialize (GTypeModule *module)
 {
     /* set up translation catalog */
     bindtextdomain (GETTEXT_PACKAGE, LOCALEDIR);
@@ -136,12 +136,12 @@ nautilus_module_initialize (GTypeModule *module)
 }
 
 void
-nautilus_module_shutdown (void)
+ammonite_module_shutdown (void)
 {
 }
 
 void
-nautilus_module_list_types (const GType **types,
+ammonite_module_list_types (const GType **types,
                             int          *num_types)
 {
     static GType type_list[1];

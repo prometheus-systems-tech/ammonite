@@ -1,0 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: 2024 The GNOME project contributors
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+#pragma once
+
+/* Keep values in sync with the org.ammonite.ammonite.FolderView schema enums: */
+#define AMMONITE_VIEW_LIST_ID            1
+#define AMMONITE_VIEW_GRID_ID            2
+/* Special ids, not used by GSettings schemas: */
+#define AMMONITE_VIEW_NETWORK_ID         3
+#define AMMONITE_VIEW_INVALID_ID         0
+
+typedef struct
+{
+    unsigned int view_id;
+    int zoom_level_min;
+    int zoom_level_max;
+    int zoom_level_standard;
+} AmmoniteViewInfo;

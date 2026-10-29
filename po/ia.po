@@ -7,7 +7,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: nautilus main\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/nautilus/issues\n"
+"Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-05-15 09:45+0000\n"
 "PO-Revision-Date: 2025-05-19 17:00-0400\n"
 "Last-Translator: Emilio Sepúlveda <emism.translations@gmail.com>\n"

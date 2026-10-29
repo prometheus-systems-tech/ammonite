@@ -22,7 +22,7 @@ struct _AudioVideoPropertiesModel
 {
     GObject parent;
 
-    NautilusPropertiesModel *model;
+    AmmonitePropertiesModel *model;
     GListStore *store;
     GstDiscoverer *disco;
 };
@@ -46,9 +46,9 @@ append_item (AudioVideoPropertiesModel *self,
              const char                *name,
              const char                *value)
 {
-    g_autoptr (NautilusPropertiesItem) item = NULL;
+    g_autoptr (AmmonitePropertiesItem) item = NULL;
 
-    item = nautilus_properties_item_new (name, value);
+    item = ammonite_properties_item_new (name, value);
 
     g_list_store_append (self->store, item);
 }
@@ -346,7 +346,7 @@ discovered_cb (GstDiscoverer             *discoverer,
         label = _("Video Properties");
     }
 
-    nautilus_properties_model_set_title (self->model, label);
+    ammonite_properties_model_set_title (self->model, label);
 
     /* General */
     duration = gst_discoverer_info_get_duration (info);
@@ -382,9 +382,9 @@ audio_video_properties_model_init (AudioVideoPropertiesModel *self)
 {
     GError *err = NULL;
 
-    self->store = g_list_store_new (NAUTILUS_TYPE_PROPERTIES_ITEM);
+    self->store = g_list_store_new (AMMONITE_TYPE_PROPERTIES_ITEM);
 
-    self->model = nautilus_properties_model_new (_("Audio/Video Properties"),
+    self->model = ammonite_properties_model_new (_("Audio/Video Properties"),
                                                  G_LIST_MODEL (self->store));
 
     self->disco = gst_discoverer_new (GST_SECOND * 60, &err);
@@ -439,7 +439,7 @@ audio_video_properties_model_set_location (AudioVideoPropertiesModel *self,
     }
 }
 
-NautilusPropertiesModel *
+AmmonitePropertiesModel *
 audio_video_properties_model_new (const char *location)
 {
     AudioVideoPropertiesModel *self = g_object_new (AUDIO_VIDEO_TYPE_PROPERTIES_MODEL, NULL);

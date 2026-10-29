@@ -4,7 +4,7 @@ set -e
 # Usage: create_release.sh [optional next version]
 
 meson_file="meson.build"
-metainfo_file="data/org.gnome.Nautilus.metainfo.xml.in.in"
+metainfo_file="data/org.ammonite.Ammonite.metainfo.xml.in.in"
 news_file="NEWS"
 
 ### Version ###

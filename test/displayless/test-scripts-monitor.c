@@ -8,11 +8,11 @@
 
 #include <glib.h>
 
-#include <nautilus-application.h>
-#include <nautilus-directory.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-file.h>
-#include <nautilus-scripts-monitor.h>
+#include <ammonite-application.h>
+#include <ammonite-directory.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-file.h>
+#include <ammonite-scripts-monitor.h>
 
 #define SCRIPT_CONTENT "#!/bin/sh\nexit 0\n"
 
@@ -50,13 +50,13 @@ scripts_menu_data_equal (ScriptsMenuData *data,
 
 /* Mimics how the real closure adds scripts to the menu. */
 static void
-add_script_to_menu (NautilusFile *file,
+add_script_to_menu (AmmoniteFile *file,
                     GMenu        *menu,
                     GHashTable   *script_accels,
                     gpointer      user_data)
 {
     ScriptsMenuData *data = user_data;
-    const gchar *name = nautilus_file_get_display_name (file);
+    const gchar *name = ammonite_file_get_display_name (file);
 
     g_ptr_array_add (data->script_names, g_strdup (name));
     g_menu_append (menu, name, "scripts.run");
@@ -100,7 +100,7 @@ assert_submenu (GMenuModel  *model,
 }
 
 static void
-on_scripts_changed (NautilusScriptsMonitor *monitor,
+on_scripts_changed (AmmoniteScriptsMonitor *monitor,
                     gpointer                user_data)
 {
     gboolean *changed = user_data;
@@ -110,10 +110,10 @@ on_scripts_changed (NautilusScriptsMonitor *monitor,
 
 /* The scripts monitor is a singleton whose initialization happens
  * asynchronously. Wait for it before using the monitor. */
-static NautilusScriptsMonitor *
+static AmmoniteScriptsMonitor *
 get_initialized_monitor (void)
 {
-    NautilusScriptsMonitor *monitor = nautilus_scripts_monitor_get ();
+    AmmoniteScriptsMonitor *monitor = ammonite_scripts_monitor_get ();
     gboolean changed = FALSE;
     gulong monitor_signal_id = g_signal_connect (monitor, "scripts-changed",
                                                  G_CALLBACK (on_scripts_changed), &changed);
@@ -127,25 +127,25 @@ get_initialized_monitor (void)
 static GFile *
 get_scripts_relative_location (const gchar *relative_path)
 {
-    g_autofree gchar *scripts_dir_path = nautilus_get_scripts_directory_path ();
+    g_autofree gchar *scripts_dir_path = ammonite_get_scripts_directory_path ();
 
     return g_file_new_build_filename (scripts_dir_path, relative_path, NULL);
 }
 
-static NautilusDirectory *
+static AmmoniteDirectory *
 get_scripts_directory (void)
 {
     g_autoptr (GFile) location = get_scripts_relative_location (NULL);
 
-    return nautilus_directory_get (location);
+    return ammonite_directory_get (location);
 }
 
-static NautilusDirectory *
+static AmmoniteDirectory *
 get_scripts_subdirectory (const gchar *relative_path)
 {
     g_autoptr (GFile) location = get_scripts_relative_location (relative_path);
 
-    return nautilus_directory_get (location);
+    return ammonite_directory_get (location);
 }
 
 static void
@@ -183,10 +183,10 @@ create_script_file (const gchar *relative_path,
 }
 
 static gboolean
-directory_contains (NautilusDirectory *directory,
+directory_contains (AmmoniteDirectory *directory,
                     const GStrv        names)
 {
-    g_autolist (NautilusFile) files = nautilus_directory_get_file_list (directory);
+    g_autolist (AmmoniteFile) files = ammonite_directory_get_file_list (directory);
 
     if (g_strv_length (names) != g_list_length (files))
     {
@@ -195,7 +195,7 @@ directory_contains (NautilusDirectory *directory,
 
     for (GList *node = files; node != NULL; node = node->next)
     {
-        const char *name = nautilus_file_get_display_name (node->data);
+        const char *name = ammonite_file_get_display_name (node->data);
 
         if (!g_strv_contains ((const gchar * const *) names, name))
         {
@@ -217,7 +217,7 @@ clear_scripts_directory (void)
 
 /* Wait until the directory monitor notices the given entries. */
 static void
-wait_for_directory_entries (NautilusDirectory *directory,
+wait_for_directory_entries (AmmoniteDirectory *directory,
                             const GStrv        names)
 {
     ITER_CONTEXT_WHILE (!directory_contains (directory, names));
@@ -226,19 +226,19 @@ wait_for_directory_entries (NautilusDirectory *directory,
 static void
 test_empty (void)
 {
-    g_autoptr (NautilusDirectory) directory = NULL;
+    g_autoptr (AmmoniteDirectory) directory = NULL;
     g_autoptr (ScriptsMenuData) data = scripts_menu_data_new ();
-    g_autoptr (NautilusScriptsMonitor) monitor = NULL;
+    g_autoptr (AmmoniteScriptsMonitor) monitor = NULL;
     g_autoptr (GMenu) menu = NULL;
 
     clear_scripts_directory ();
     monitor = get_initialized_monitor ();
     directory = get_scripts_directory ();
     directory_load_attributes (directory,
-                               NAUTILUS_ATTRIBUTE_FILE_LIST |
-                               NAUTILUS_ATTRIBUTE_INFO);
+                               AMMONITE_ATTRIBUTE_FILE_LIST |
+                               AMMONITE_ATTRIBUTE_INFO);
 
-    menu = nautilus_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
+    menu = ammonite_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
 
     g_assert_null (menu);
     g_assert_cmpuint (data->script_names->len, ==, 0);
@@ -247,9 +247,9 @@ test_empty (void)
 static void
 test_non_exec_script (void)
 {
-    g_autoptr (NautilusDirectory) directory = NULL;
+    g_autoptr (AmmoniteDirectory) directory = NULL;
     g_autoptr (ScriptsMenuData) data = scripts_menu_data_new ();
-    g_autoptr (NautilusScriptsMonitor) monitor = NULL;
+    g_autoptr (AmmoniteScriptsMonitor) monitor = NULL;
     g_autoptr (GMenu) menu = NULL;
     const GStrv expected_entries = (char *[]){
         "not_executable.sh",
@@ -264,10 +264,10 @@ test_non_exec_script (void)
     directory = get_scripts_directory ();
     wait_for_directory_entries (directory, expected_entries);
     directory_load_attributes (directory,
-                               NAUTILUS_ATTRIBUTE_FILE_LIST |
-                               NAUTILUS_ATTRIBUTE_INFO);
+                               AMMONITE_ATTRIBUTE_FILE_LIST |
+                               AMMONITE_ATTRIBUTE_INFO);
 
-    menu = nautilus_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
+    menu = ammonite_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
 
     /* The file is known to the directory but it is not executable, so the
      * scripts menu must be empty. */
@@ -278,9 +278,9 @@ test_non_exec_script (void)
 static void
 test_single_script (void)
 {
-    g_autoptr (NautilusDirectory) directory = NULL;
+    g_autoptr (AmmoniteDirectory) directory = NULL;
     g_autoptr (ScriptsMenuData) data = scripts_menu_data_new ();
-    g_autoptr (NautilusScriptsMonitor) monitor = NULL;
+    g_autoptr (AmmoniteScriptsMonitor) monitor = NULL;
     g_autoptr (GMenu) menu = NULL;
     g_autofree gchar *label = NULL;
     const GStrv expected_entries = (char *[]){
@@ -296,10 +296,10 @@ test_single_script (void)
     directory = get_scripts_directory ();
     wait_for_directory_entries (directory, expected_entries);
     directory_load_attributes (directory,
-                               NAUTILUS_ATTRIBUTE_FILE_LIST |
-                               NAUTILUS_ATTRIBUTE_INFO);
+                               AMMONITE_ATTRIBUTE_FILE_LIST |
+                               AMMONITE_ATTRIBUTE_INFO);
 
-    menu = nautilus_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
+    menu = ammonite_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
 
     g_assert_nonnull (menu);
     g_assert_cmpuint (g_menu_model_get_n_items (G_MENU_MODEL (menu)), ==, 1);
@@ -313,13 +313,13 @@ test_single_script (void)
 static void
 test_hierarchy (void)
 {
-    g_autoptr (NautilusDirectory) directory = NULL;
-    g_autoptr (NautilusDirectory) first_folder = NULL;
-    g_autoptr (NautilusDirectory) second_folder = NULL;
+    g_autoptr (AmmoniteDirectory) directory = NULL;
+    g_autoptr (AmmoniteDirectory) first_folder = NULL;
+    g_autoptr (AmmoniteDirectory) second_folder = NULL;
     g_autoptr (ScriptsMenuData) data = scripts_menu_data_new ();
-    g_autoptr (NautilusScriptsMonitor) monitor = NULL;
-    NautilusAttributes attributes = NAUTILUS_ATTRIBUTE_FILE_LIST |
-                                    NAUTILUS_ATTRIBUTE_INFO;
+    g_autoptr (AmmoniteScriptsMonitor) monitor = NULL;
+    AmmoniteAttributes attributes = AMMONITE_ATTRIBUTE_FILE_LIST |
+                                    AMMONITE_ATTRIBUTE_INFO;
     g_autoptr (GMenu) menu = NULL;
     g_autofree gchar *label = NULL;
     const GStrv top_entries = (char *[]){
@@ -366,7 +366,7 @@ test_hierarchy (void)
     /* Building the menu starts monitoring the subfolders, whose contents
      * may not be loaded yet at this point. Wait for them, then rebuild
      * the menu, like the real menu does when notified of script changes. */
-    menu = nautilus_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
+    menu = ammonite_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
     g_clear_object (&menu);
     g_ptr_array_set_size (data->script_names, 0);
 
@@ -375,7 +375,7 @@ test_hierarchy (void)
     wait_for_directory_entries (second_folder, second_folder_entries);
     directory_load_attributes (second_folder, attributes);
 
-    menu = nautilus_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
+    menu = ammonite_scripts_monitor_get_menu (monitor, add_script_to_menu, data);
 
     g_assert_nonnull (menu);
     g_assert_cmpuint (g_menu_model_get_n_items (G_MENU_MODEL (menu)), ==, 3);
@@ -398,7 +398,7 @@ main (int   argc,
     /* The scripts monitor is a process-wide singleton reading the scripts
      * directory. Redirect it to the test's temporary directory before it gets
      * a chance to read the real one. */
-    if (nautilus_application_is_sandboxed ())
+    if (ammonite_application_is_sandboxed ())
     {
         g_setenv ("HOME", test_get_tmp_dir (), TRUE);
     }
@@ -409,7 +409,7 @@ main (int   argc,
     g_setenv ("XDG_CONFIG_HOME", test_get_tmp_dir (), TRUE);
 
     g_test_init (&argc, &argv, NULL);
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/empty",
                      test_empty);

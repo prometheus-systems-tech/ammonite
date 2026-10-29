@@ -1,25 +1,25 @@
 toml_data = configuration_data()
 toml_data.set('VERSION', meson.project_version())
 
-nautilus_toml = configure_file(
-  input: 'nautilus.toml.in',
-  output: 'nautilus.toml',
+ammonite_toml = configure_file(
+  input: 'ammonite.toml.in',
+  output: 'ammonite.toml',
   configuration: toml_data,
 )
 
 custom_target(
-  'nautilus-doc',
+  'ammonite-doc',
   input: [
-    nautilus_toml,
-    nautilus_extension_gir[0],
+    ammonite_toml,
+    ammonite_extension_gir[0],
   ],
-  output: 'nautilus',
+  output: 'ammonite',
   command: [
     gi_docgen,
     'generate',
     '--quiet',
     '--add-include-path=@0@'.format(
-      meson.project_source_root() / 'libnautilus-extension',
+      meson.project_source_root() / 'libammonite-extension',
     ),
     '--config=@INPUT0@',
     '--output-dir=@OUTPUT@',

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/org/ammonite/ammonite">
+    <file alias="appdata" compressed="true" preprocess="xml-stripblanks">./../data/@appid@.metainfo.xml</file>
+
+    <!-- Menu definitions -->
+    <file preprocess="xml-stripblanks">menu/ammonite-files-view-context-menus.ui</file>
+    <file preprocess="xml-stripblanks">menu/ammonite-toolbar-view-menu.ui</file>
+    <file preprocess="xml-stripblanks">menu/ammonite-pathbar-context-menu.ui</file>
+
+    <!-- UI files generated from Blueprint -->
+    <file>ui/ammonite-preferences-dialog.ui</file>
+    <file>ui/ammonite-search-popover.ui</file>
+    <file>ui/ammonite-app-chooser.ui</file>
+    <file>ui/ammonite-app-chooser-widget.ui</file>
+    <file>ui/ammonite-batch-rename-dialog.ui</file>
+    <file>ui/ammonite-column-chooser.ui</file>
+    <file>ui/ammonite-compress-dialog.ui</file>
+    <file>ui/ammonite-date-entry-row.ui</file>
+    <file>ui/ammonite-date-range-dialog.ui</file>
+    <file>ui/ammonite-file-chooser.ui</file>
+    <file>ui/ammonite-file-conflict-dialog.ui</file>
+    <file>ui/ammonite-file-properties-change-permissions.ui</file>
+    <file>ui/ammonite-files-view.ui</file>
+    <file>ui/ammonite-files-view-select-items.ui</file>
+    <file>ui/ammonite-grid-cell.ui</file>
+    <file>ui/ammonite-grid-view-captions-dialog.ui</file>
+    <file>ui/ammonite-history-controls.ui</file>
+    <file>ui/ammonite-name-cell.ui</file>
+    <file>ui/ammonite-network-address-bar.ui</file>
+    <file>ui/ammonite-network-cell.ui</file>
+    <file>ui/ammonite-new-folder-dialog.ui</file>
+    <file>ui/ammonite-operations-ui-manager-request-passphrase.ui</file>
+    <file>ui/ammonite-progress-indicator.ui</file>
+    <file>ui/ammonite-progress-info-widget.ui</file>
+    <file>ui/ammonite-properties-widget.ui</file>
+    <file>ui/ammonite-properties-window.ui</file>
+    <file>ui/ammonite-query-editor.ui</file>
+    <file>ui/ammonite-rename-file-popover.ui</file>
+    <file>ui/ammonite-search-types-dialog.ui</file>
+    <file>ui/ammonite-sidebar-row.ui</file>
+    <file>ui/ammonite-toolbar.ui</file>
+    <file>ui/ammonite-view-controls.ui</file>
+    <file>ui/ammonite-window.ui</file>
+    <file alias="shortcuts-dialog.ui">ui/shortcuts-dialog.ui</file>
+    <!-- Images -->
+    <file>image/checkerboard.png</file>
+    <file>image/filmholes.png</file>
+    <file preprocess="xml-stripblanks">image/text-x-preview.svg</file>
+
+    <file>style.css</file>
+
+    <!-- Icons -->
+    <file preprocess="xml-stripblanks">icons/scalable/actions/arrow-next-symbolic-rtl.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/arrow-next-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/cancel-operation-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/cut-large-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/cut-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/emblem-not-accessible-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/emblem-readonly-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/emblem-symbolic-link-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/external-link-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/file-operation-cancelled-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/file-operation-finished-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/funnel-outline-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/image-print-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/info-outline-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/ammonite-file-chooser-options-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/ammonite-folder-search-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/ammonite-search-filters-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/network-computer-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/paper-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/quotation-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/remove-custom-icon-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/rich-text-symbolic.svg</file>
+  </gresource>
+</gresources>

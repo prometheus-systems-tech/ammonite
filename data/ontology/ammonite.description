@@ -1,0 +1,9 @@
+@prefix dsc: <http://tracker.api.gnome.org/ontology/v3/dsc#> .
+
+<virtual-ontology-uri:ammonite.ontology> a dsc:Ontology ;
+    dsc:title "Ammonite ontology" ;
+    dsc:description "Tracker database schema for Ammonite private data." ;
+
+    dsc:localPrefix "ammonite" ;
+    dsc:baseUrl "https://ammonite.invalid/ns#" ;
+    dsc:relativePath "./ammonite.ontology" ;

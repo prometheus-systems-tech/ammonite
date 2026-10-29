@@ -17,7 +17,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: nautilus trunk\n"
-"Report-Msgid-Bugs-To: https://gitlab.gnome.org/GNOME/nautilus/issues\n"
+"Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-08-05 22:41+0000\n"
 "PO-Revision-Date: 2026-08-06 14:55+0300\n"
 "Last-Translator: Artur So <arturios2005@mail.ru>\n"

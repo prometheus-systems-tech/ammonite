@@ -1,9 +1,9 @@
 #include "test-utilities.h"
 
-#include <src/nautilus-file-operations.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-file-utilities.h>
-#include <src/nautilus-tag-manager.h>
+#include <src/ammonite-file-operations.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-file-utilities.h>
+#include <src/ammonite-tag-manager.h>
 
 static void
 test_move_one_file (void)
@@ -23,7 +23,7 @@ test_move_one_file (void)
 
     create_one_file ("move");
 
-    nautilus_file_operations_move_sync (files,
+    ammonite_file_operations_move_sync (files,
                                         second_dir);
 
     g_assert_true (g_file_query_exists (result_file, NULL));
@@ -60,7 +60,7 @@ test_move_one_empty_directory (void)
 
     create_one_empty_directory ("move");
 
-    nautilus_file_operations_move_sync (files,
+    ammonite_file_operations_move_sync (files,
                                         second_dir);
 
     g_assert_true (g_file_query_exists (result_file, NULL));
@@ -96,7 +96,7 @@ move_multiple_files (const gchar *prefix,
         files = g_list_prepend (files, file);
     }
 
-    nautilus_file_operations_move_sync (files, dest);
+    ammonite_file_operations_move_sync (files, dest);
 }
 
 static void
@@ -346,7 +346,7 @@ test_move_full_directory (void)
 
     create_one_file ("move");
 
-    nautilus_file_operations_move_sync (&(GList){ .data = first_dir },
+    ammonite_file_operations_move_sync (&(GList){ .data = first_dir },
                                         second_dir);
 
     file_hierarchy_assert_exists (before_move_hierarchy, "move", FALSE);
@@ -398,7 +398,7 @@ test_move_first_hierarchy (void)
 
     create_first_hierarchy ("move");
 
-    nautilus_file_operations_move_sync (files,
+    ammonite_file_operations_move_sync (files,
                                         second_dir);
 
     file_hierarchy_assert_exists (before_move_hierarchy, "move", FALSE);
@@ -448,7 +448,7 @@ test_move_second_hierarchy (void)
 
     create_second_hierarchy ("move");
 
-    nautilus_file_operations_move_sync (&(GList){ .data = first_dir },
+    ammonite_file_operations_move_sync (&(GList){ .data = first_dir },
                                         second_dir);
 
     file_hierarchy_assert_exists (before_move_hierarchy, "move", FALSE);
@@ -505,7 +505,7 @@ test_move_third_hierarchy (void)
 
     create_third_hierarchy ("move");
 
-    nautilus_file_operations_move_sync (&(GList){ .data = first_dir },
+    ammonite_file_operations_move_sync (&(GList){ .data = first_dir },
                                         second_dir);
 
     file_hierarchy_assert_exists (before_move_hierarchy, "move", FALSE);
@@ -568,7 +568,7 @@ test_move_fourth_hierarchy (void)
     files = g_list_prepend (files, g_object_ref (first_dir));
     files = g_list_prepend (files, g_object_ref (second_dir));
 
-    nautilus_file_operations_move_sync (files, third_dir);
+    ammonite_file_operations_move_sync (files, third_dir);
 
     file_hierarchy_assert_exists (before_move_hierarchy, "move", FALSE);
     file_hierarchy_assert_exists (after_move_hierarchy, "move", TRUE);
@@ -605,15 +605,15 @@ test_move_dir_into_itself (void)
     file_hierarchy_create (source_hierarchy, "");
 
     /* Clear to check for the move operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
-    nautilus_file_operations_move_sync (&(GList){ .data = first_dir },
+    ammonite_file_operations_move_sync (&(GList){ .data = first_dir },
                                         test_dir);
 
     file_hierarchy_assert_exists (source_hierarchy, "", TRUE);
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -639,15 +639,15 @@ test_move_dir_into_self_subdir (void)
     file_hierarchy_create (source_hierarchy, "");
 
     /* Clear to check for the move operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
-    nautilus_file_operations_move_sync (&(GList){ .data = first_dir },
+    ammonite_file_operations_move_sync (&(GList){ .data = first_dir },
                                         first_child);
 
     file_hierarchy_assert_exists (source_hierarchy, "", TRUE);
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -692,15 +692,15 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
     int ret;
 
-    undo_manager = nautilus_file_undo_manager_new ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    undo_manager = ammonite_file_undo_manager_new ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     setup_test_suite ();
 

@@ -1,6 +1,6 @@
 icondir = join_paths('icons', 'hicolor', 'scalable', 'apps')
 install_data(
-  join_paths(icondir, 'org.gnome.Nautilus' + profile + '.svg'),
+  join_paths(icondir, 'org.ammonite.Ammonite' + profile + '.svg'),
   install_dir: join_paths(datadir, icondir),
   rename: f'@application_id@.svg',
 )
@@ -8,7 +8,7 @@ install_data(
 icondir = join_paths('icons', 'hicolor', 'symbolic', 'apps')
 
 install_data(
-  join_paths(icondir, 'org.gnome.Nautilus-symbolic.svg'),
+  join_paths(icondir, 'org.ammonite.Ammonite-symbolic.svg'),
   install_dir: join_paths(datadir, icondir),
   rename: f'@application_id@-symbolic.svg',
 )
@@ -21,8 +21,8 @@ desktop_conf.set('icon', application_id)
 
 desktop = i18n.merge_file(
   input: configure_file(
-    input: files('org.gnome.Nautilus.desktop.in.in'),
-    output: 'org.gnome.Nautilus.desktop.in',
+    input: files('org.ammonite.Ammonite.desktop.in.in'),
+    output: 'org.ammonite.Ammonite.desktop.in',
     configuration: desktop_conf,
   ),
   output: f'@application_id@.desktop',
@@ -33,8 +33,8 @@ desktop = i18n.merge_file(
 )
 
 desktop_autorun_software = i18n.merge_file(
-  input: 'nautilus-autorun-software.desktop.in',
-  output: 'nautilus-autorun-software.desktop',
+  input: 'ammonite-autorun-software.desktop.in',
+  output: 'ammonite-autorun-software.desktop',
   install: true,
   install_dir: desktopdir,
   po_dir: po_dir,
@@ -56,8 +56,8 @@ appdata_conf.set('release-version', release_version)
 
 appdata = i18n.merge_file(
   input: configure_file(
-    input: files('org.gnome.Nautilus.metainfo.xml.in.in'),
-    output: 'org.gnome.Nautilus.metainfo.xml.in',
+    input: files('org.ammonite.Ammonite.metainfo.xml.in.in'),
+    output: 'org.ammonite.Ammonite.metainfo.xml.in',
     configuration: appdata_conf,
   ),
   output: f'@application_id@.metainfo.xml',
@@ -71,7 +71,7 @@ service_conf.set('appid', application_id)
 service_conf.set('bindir', join_paths(prefix, bindir))
 
 configure_file(
-  input: 'org.gnome.Nautilus.service.in',
+  input: 'org.ammonite.Ammonite.service.in',
   output: f'@application_id@.service',
   configuration: service_conf,
   install_dir: servicedir,
@@ -91,18 +91,18 @@ search_provider_conf.set('profile', profile)
 
 configure_file(
   configuration: search_provider_conf,
-  input: files('org.gnome.Nautilus.search-provider.ini.in'),
+  input: files('org.ammonite.Ammonite.search-provider.ini.in'),
   install_dir: join_paths(datadir, 'gnome-shell', 'search-providers'),
   output: f'@application_id@.search-provider.ini',
 )
 
 gnome.compile_schemas(
   build_by_default: true,
-  depend_files: 'org.gnome.nautilus.gschema.xml',
+  depend_files: 'org.ammonite.ammonite.gschema.xml',
 )
 
 install_data(
-  'org.gnome.nautilus.gschema.xml',
+  'org.ammonite.ammonite.gschema.xml',
   install_dir: join_paths(datadir, 'glib-2.0', 'schemas'),
 )
 

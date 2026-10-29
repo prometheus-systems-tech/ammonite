@@ -1,7 +1,7 @@
 /.gitattributes                             export-ignore
 /.gitignore                                 export-ignore
 /.gitmodules                                export-ignore
-/nautilus.doap                              export-ignore
+/ammonite.doap                              export-ignore
 /docs/Overview.md                           export-ignore
 /test/file-torture.py                       export-ignore
 /src/gnome-desktop/gnome-desktop-update.sh  export-ignore

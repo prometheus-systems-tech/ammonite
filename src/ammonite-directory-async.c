@@ -1,0 +1,4218 @@
+/*
+ * ammonite-directory-async.c: Ammonite directory model state machine.
+ *
+ * SPDX-FileCopyrightText: 1999, 2000, 2001 Eazel, Inc.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Darin Adler <darin@bentspoon.com>
+ */
+#define G_LOG_DOMAIN "ammonite-async-jobs"
+
+#include "ammonite-directory-notify.h"
+#include "ammonite-directory-private.h"
+#include "ammonite-enums.h"
+#include "ammonite-file-private.h"
+#include "ammonite-file-utilities.h"
+#include "ammonite-global-preferences.h"
+#include "ammonite-hash-queue.h"
+#include "ammonite-monitor.h"
+#include "ammonite-signaller.h"
+#include "ammonite-thumbnails.h"
+
+/* turn this on to check if async. job calls are balanced */
+#if 0
+#define DEBUG_ASYNC_JOBS
+#endif
+
+#define DIRECTORY_LOAD_ITEMS_PER_CALLBACK 100
+
+/* Keep async. jobs down to this number for all directories. */
+#define MAX_ASYNC_JOBS 10
+
+struct ThumbnailInfoState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    AmmoniteFile *file;
+};
+
+struct ThumbnailBufState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    AmmoniteFile *file;
+};
+
+struct MountState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    AmmoniteFile *file;
+};
+
+struct FilesystemInfoState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    AmmoniteFile *file;
+};
+
+struct DirectoryLoadState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    GFileEnumerator *enumerator;
+    AmmoniteFile *load_directory_file;
+    int load_file_count;
+};
+
+struct GetInfoState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+};
+
+struct NewFilesState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    int count;
+};
+
+struct DirectoryCountState
+{
+    AmmoniteDirectory *directory;
+    AmmoniteFile *count_file;
+    GCancellable *cancellable;
+    GFileEnumerator *enumerator;
+    int file_count;
+};
+
+struct DeepCountState
+{
+    AmmoniteDirectory *directory;
+    GCancellable *cancellable;
+    GFileEnumerator *enumerator;
+    GFile *deep_count_location;
+    GList *deep_count_subdirectories;
+    GHashTable *seen_deep_count_inodes;
+    char *fs_id;
+};
+
+
+
+typedef struct
+{
+    AmmoniteFile *file;     /* Which file, NULL means all. */
+    union
+    {
+        AmmoniteDirectoryCallback directory;
+        AmmoniteFileCallback file;
+    } callback;
+    gpointer callback_data;
+    AmmoniteAttributes attributes;
+} ReadyCallback;
+
+typedef struct
+{
+    AmmoniteFile *file;     /* Which file, NULL means all. */
+    gboolean monitor_hidden_files;     /* defines whether "all" includes hidden files */
+    gconstpointer client;
+    AmmoniteAttributes attributes;
+} Monitor;
+
+typedef struct
+{
+    AmmoniteDirectory *directory;
+    AmmoniteInfoProvider *provider;
+    AmmoniteOperationHandle *handle;
+    AmmoniteOperationResult result;
+} InfoProviderResponse;
+
+typedef gboolean (*FileCheck) (AmmoniteFile *);
+
+/* Current number of async. jobs. */
+static int async_job_count;
+static GHashTable *waiting_directories;
+#ifdef DEBUG_ASYNC_JOBS
+static GHashTable *async_jobs;
+#endif
+
+/* Forward declarations for functions that need them. */
+static void     deep_count_load (DeepCountState *state,
+                                 GFile          *location);
+static gboolean
+all_attributes_available (AmmoniteDirectory *directory,
+                          AmmoniteFile      *file,
+                          AmmoniteAttributes attributes);
+static void     cancel_loading_attributes (AmmoniteDirectory *directory,
+                                           AmmoniteAttributes attributes);
+static void     add_all_files_to_work_queue (AmmoniteDirectory *directory);
+static void     move_file_to_low_priority_queue (AmmoniteDirectory *directory,
+                                                 AmmoniteFile      *file);
+static void     move_file_to_extension_queue (AmmoniteDirectory *directory,
+                                              AmmoniteFile      *file);
+
+static void
+request_counter_add (RequestCounter     counter,
+                     AmmoniteAttributes attributes)
+{
+    for (guint i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        if (attributes & (1 << i))
+        {
+            counter[i]++;
+        }
+    }
+}
+
+static void
+request_counter_remove (RequestCounter     counter,
+                        AmmoniteAttributes attributes)
+{
+    for (guint i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        if (attributes & (1 << i))
+        {
+            counter[i]--;
+        }
+    }
+}
+
+static gboolean
+request_counter_has (RequestCounter     counter,
+                     AmmoniteAttributes attributes)
+{
+    for (guint i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        if (attributes & (1 << i) && counter[i] == 0)
+        {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+#if 0
+static void
+ammonite_directory_verify_request_counts (AmmoniteDirectory *directory)
+{
+    GList *l;
+    RequestCounter counters;
+    int i;
+    gboolean fail;
+    GHashTableIter monitor_iter;
+    gpointer value;
+
+    fail = FALSE;
+    for (i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        counters[i] = 0;
+    }
+    g_hash_table_iter_init (&monitor_iter, directory->details->monitor_table);
+    while (g_hash_table_iter_next (&monitor_iter, NULL, &value))
+    {
+        for (l = value; l; l = l->next)
+        {
+            Monitor *monitor = l->data;
+            request_counter_add (counters, monitor->attributes);
+        }
+    }
+    for (i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        if (counters[i] != directory->details->monitor_counters[i])
+        {
+            g_warning ("monitor counter for %i is wrong, expecting %d but found %d",
+                       i, counters[i], directory->details->monitor_counters[i]);
+            fail = TRUE;
+        }
+    }
+    for (i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        counters[i] = 0;
+    }
+    for (l = directory->details->call_when_ready_list; l != NULL; l = l->next)
+    {
+        ReadyCallback *callback = l->data;
+        request_counter_add (counters, callback->attributes);
+    }
+    for (i = 0; i < AMMONITE_ATTRIBUTE_N_TOTAL; i++)
+    {
+        if (counters[i] != directory->details->call_when_ready_counters[i])
+        {
+            g_warning ("call when ready counter for %i is wrong, expecting %d but found %d",
+                       i, counters[i], directory->details->call_when_ready_counters[i]);
+            fail = TRUE;
+        }
+    }
+    g_assert (!fail);
+}
+#endif
+
+/* Start a job. This is really just a way of limiting the number of
+ * async. requests that we issue at any given time. Without this, the
+ * number of requests is unbounded.
+ */
+static gboolean
+async_job_start (AmmoniteDirectory *directory,
+                 const char        *job)
+{
+#ifdef DEBUG_ASYNC_JOBS
+    char *key;
+#endif
+
+    g_debug ("starting %s in %p", job, directory->details->location);
+
+    g_assert (async_job_count >= 0);
+    g_assert (async_job_count <= MAX_ASYNC_JOBS);
+
+    if (async_job_count >= MAX_ASYNC_JOBS)
+    {
+        if (waiting_directories == NULL)
+        {
+            waiting_directories = g_hash_table_new (NULL, NULL);
+        }
+
+        g_hash_table_insert (waiting_directories,
+                             directory,
+                             directory);
+
+        return FALSE;
+    }
+
+#ifdef DEBUG_ASYNC_JOBS
+    {
+        char *uri;
+        if (async_jobs == NULL)
+        {
+            async_jobs = g_hash_table_new (g_str_hash, g_str_equal);
+        }
+        uri = ammonite_directory_get_uri (directory);
+        key = g_strconcat (uri, ": ", job, NULL);
+        if (g_hash_table_lookup (async_jobs, key) != NULL)
+        {
+            g_warning ("same job twice: %s in %s",
+                       job, uri);
+        }
+        g_free (uri);
+        g_hash_table_insert (async_jobs, key, directory);
+    }
+#endif
+
+    async_job_count += 1;
+    return TRUE;
+}
+
+/* End a job. */
+static void
+async_job_end (AmmoniteDirectory *directory,
+               const char        *job)
+{
+#ifdef DEBUG_ASYNC_JOBS
+    char *key;
+    gpointer table_key, value;
+#endif
+
+    g_debug ("stopping %s in %p", job, directory->details->location);
+
+    g_assert (async_job_count > 0);
+
+#ifdef DEBUG_ASYNC_JOBS
+    {
+        char *uri;
+        uri = ammonite_directory_get_uri (directory);
+        g_assert (async_jobs != NULL);
+        key = g_strconcat (uri, ": ", job, NULL);
+        if (!g_hash_table_lookup_extended (async_jobs, key, &table_key, &value))
+        {
+            g_warning ("ending job we didn't start: %s in %s",
+                       job, uri);
+        }
+        else
+        {
+            g_hash_table_remove (async_jobs, key);
+            g_free (table_key);
+        }
+        g_free (uri);
+        g_free (key);
+    }
+#endif
+
+    async_job_count -= 1;
+}
+
+/* Helper to get one value from a hash table. */
+static void
+get_one_value_callback (gpointer key,
+                        gpointer value,
+                        gpointer callback_data)
+{
+    gpointer *returned_value;
+
+    returned_value = callback_data;
+    *returned_value = value;
+}
+
+/* return a single value from a hash table. */
+static gpointer
+get_one_value (GHashTable *table)
+{
+    gpointer value;
+
+    value = NULL;
+    if (table != NULL)
+    {
+        g_hash_table_foreach (table, get_one_value_callback, &value);
+    }
+    return value;
+}
+
+/* Wake up directories that are "blocked" as long as there are job
+ * slots available.
+ */
+static void
+async_job_wake_up (void)
+{
+    static gboolean already_waking_up = FALSE;
+    gpointer value;
+
+    g_assert (async_job_count >= 0);
+    g_assert (async_job_count <= MAX_ASYNC_JOBS);
+
+    if (already_waking_up)
+    {
+        return;
+    }
+
+    already_waking_up = TRUE;
+    while (async_job_count < MAX_ASYNC_JOBS)
+    {
+        value = get_one_value (waiting_directories);
+        if (value == NULL)
+        {
+            break;
+        }
+        g_hash_table_remove (waiting_directories, value);
+        ammonite_directory_async_state_changed
+            (AMMONITE_DIRECTORY (value));
+    }
+    already_waking_up = FALSE;
+}
+
+static void
+directory_count_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->count_in_progress != NULL)
+    {
+        g_cancellable_cancel (directory->details->count_in_progress->cancellable);
+        directory->details->count_in_progress = NULL;
+    }
+}
+
+static void
+deep_count_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->deep_count_in_progress != NULL)
+    {
+        g_assert (AMMONITE_IS_FILE (directory->details->deep_count_file));
+
+        g_cancellable_cancel (directory->details->deep_count_in_progress->cancellable);
+
+        directory->details->deep_count_file->details->deep_counts_status = AMMONITE_REQUEST_NOT_STARTED;
+
+        directory->details->deep_count_in_progress->directory = NULL;
+        directory->details->deep_count_in_progress = NULL;
+        directory->details->deep_count_file = NULL;
+
+        async_job_end (directory, "deep count");
+    }
+}
+
+static void
+thumbnail_info_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->thumbnail_info_state != NULL)
+    {
+        g_cancellable_cancel (directory->details->thumbnail_info_state->cancellable);
+        directory->details->thumbnail_info_state->directory = NULL;
+        directory->details->thumbnail_info_state = NULL;
+        async_job_end (directory, "thumbnail info");
+    }
+}
+
+static void
+thumbnail_buf_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->thumbnail_buf_state != NULL)
+    {
+        g_cancellable_cancel (directory->details->thumbnail_buf_state->cancellable);
+        directory->details->thumbnail_buf_state->directory = NULL;
+        directory->details->thumbnail_buf_state = NULL;
+        async_job_end (directory, "thumbnail buffer");
+    }
+}
+
+static void
+mount_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->mount_state != NULL)
+    {
+        g_cancellable_cancel (directory->details->mount_state->cancellable);
+        directory->details->mount_state->directory = NULL;
+        directory->details->mount_state = NULL;
+        async_job_end (directory, "mount");
+    }
+}
+
+static void
+file_info_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->get_info_in_progress != NULL)
+    {
+        g_cancellable_cancel (directory->details->get_info_in_progress->cancellable);
+        directory->details->get_info_in_progress->directory = NULL;
+        directory->details->get_info_in_progress = NULL;
+        directory->details->get_info_file = NULL;
+
+        async_job_end (directory, "file info");
+    }
+}
+
+static void
+new_files_cancel (AmmoniteDirectory *directory)
+{
+    GList *l;
+    NewFilesState *state;
+
+    if (directory->details->new_files_in_progress != NULL)
+    {
+        for (l = directory->details->new_files_in_progress; l != NULL; l = l->next)
+        {
+            state = l->data;
+            g_cancellable_cancel (state->cancellable);
+            state->directory = NULL;
+        }
+        g_list_free (directory->details->new_files_in_progress);
+        directory->details->new_files_in_progress = NULL;
+    }
+}
+
+static int
+monitor_key_compare (gconstpointer a,
+                     gconstpointer data)
+{
+    const Monitor *monitor;
+    const Monitor *compare_monitor;
+
+    monitor = a;
+    compare_monitor = data;
+
+    if (monitor->client < compare_monitor->client)
+    {
+        return -1;
+    }
+    if (monitor->client > compare_monitor->client)
+    {
+        return +1;
+    }
+
+    if (monitor->file < compare_monitor->file)
+    {
+        return -1;
+    }
+    if (monitor->file > compare_monitor->file)
+    {
+        return +1;
+    }
+
+    return 0;
+}
+
+static Monitor *
+find_monitor (AmmoniteDirectory *directory,
+              AmmoniteFile      *file,
+              gconstpointer      client)
+{
+    GList *l;
+
+    l = g_hash_table_lookup (directory->details->monitor_table, file);
+
+    if (l)
+    {
+        Monitor key = {};
+        key.client = client;
+        key.file = file;
+
+        l = g_list_find_custom (l, &key, monitor_key_compare);
+        return l ? l->data : NULL;
+    }
+
+    return NULL;
+}
+
+static gboolean
+insert_new_monitor (AmmoniteDirectory *directory,
+                    Monitor           *monitor)
+{
+    GList *list;
+
+    if (find_monitor (directory, monitor->file, monitor->client) != NULL)
+    {
+        return FALSE;
+    }
+
+    list = g_hash_table_lookup (directory->details->monitor_table, monitor->file);
+    if (list == NULL)
+    {
+        list = g_list_append (list, monitor);
+        g_hash_table_insert (directory->details->monitor_table,
+                             monitor->file,
+                             list);
+    }
+    else
+    {
+        list = g_list_append (list, monitor);
+    }
+
+    request_counter_add (directory->details->monitor_counters,
+                         monitor->attributes);
+
+    return TRUE;
+}
+
+static Monitor *
+remove_monitor_from_table (AmmoniteDirectory *directory,
+                           AmmoniteFile      *file,
+                           gconstpointer      client)
+{
+    GList *list, *l, *new_list;
+    Monitor *monitor = NULL;
+
+    list = g_hash_table_lookup (directory->details->monitor_table, file);
+    if (list)
+    {
+        Monitor key = {};
+        key.client = client;
+        key.file = file;
+
+        l = g_list_find_custom (list, &key, monitor_key_compare);
+        monitor = l ? l->data : NULL;
+    }
+
+    if (monitor != NULL)
+    {
+        new_list = g_list_delete_link (list, l);
+        if (new_list == NULL)
+        {
+            g_hash_table_remove (directory->details->monitor_table, file);
+        }
+        else
+        {
+            g_hash_table_replace (directory->details->monitor_table, file, new_list);
+        }
+    }
+
+    return monitor;
+}
+
+static void
+remove_monitor (AmmoniteDirectory *directory,
+                AmmoniteFile      *file,
+                gconstpointer      client)
+{
+    Monitor *monitor;
+
+    monitor = remove_monitor_from_table (directory, file, client);
+
+    if (monitor != NULL)
+    {
+        request_counter_remove (directory->details->monitor_counters,
+                                monitor->attributes);
+        g_free (monitor);
+    }
+}
+
+static void
+mime_db_changed_callback (GObject           *ignore,
+                          AmmoniteDirectory *dir)
+{
+    g_assert (dir != NULL);
+    g_assert (dir->details != NULL);
+
+    ammonite_directory_force_reload_internal (dir, AMMONITE_ATTRIBUTE_INFO);
+}
+
+void
+ammonite_directory_monitor_add_internal (AmmoniteDirectory         *directory,
+                                         AmmoniteFile              *file,
+                                         gconstpointer              client,
+                                         gboolean                   monitor_hidden_files,
+                                         AmmoniteAttributes         attributes,
+                                         AmmoniteDirectoryCallback  callback,
+                                         gpointer                   callback_data)
+{
+    Monitor *monitor;
+    GList *file_list;
+
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+
+    /* Replace any current monitor for this client/file pair. */
+    remove_monitor (directory, file, client);
+
+    /* Add the new monitor. */
+    monitor = g_new (Monitor, 1);
+    monitor->file = file;
+    monitor->monitor_hidden_files = monitor_hidden_files;
+    monitor->client = client;
+    monitor->attributes = attributes;
+
+    if (file == NULL)
+    {
+        monitor->attributes |= AMMONITE_ATTRIBUTE_FILE_LIST;
+    }
+
+    insert_new_monitor (directory, monitor);
+
+    if (callback != NULL)
+    {
+        g_assert (file == NULL);
+
+        file_list = ammonite_directory_get_file_list (directory);
+        (*callback)(directory, file_list, callback_data);
+        ammonite_file_list_free (file_list);
+    }
+
+    /* Start the "real" monitoring (FAM or whatever).
+     * Only set up the directory monitor during calls to ammonite_directory_file_monitor_add
+     * (when file is NULL). It allows us to avoid one file monitor per file in a directory.
+     * It also avoids setting up monitors for custom directories (starred, search...)
+     * where many unique folders may exist in one directory.
+     */
+    if (directory->details->monitor == NULL && file == NULL)
+    {
+        directory->details->monitor = ammonite_monitor_directory (directory->details->location);
+    }
+
+
+    if ((IS_ATTRIBUTE_SET (monitor->attributes, AMMONITE_ATTRIBUTE_INFO)) &&
+        directory->details->mime_db_monitor == 0)
+    {
+        directory->details->mime_db_monitor =
+            g_signal_connect_object (ammonite_signaller_get_current (),
+                                     "mime-data-changed",
+                                     G_CALLBACK (mime_db_changed_callback), directory,
+                                     G_CONNECT_DEFAULT);
+    }
+
+    /* Put the monitor file or all the files on the work queue. */
+    if (file != NULL)
+    {
+        ammonite_directory_add_file_to_work_queue (directory, file);
+    }
+    else
+    {
+        add_all_files_to_work_queue (directory);
+    }
+
+    /* Kick off I/O. */
+    ammonite_directory_async_state_changed (directory);
+}
+
+static void
+set_file_unconfirmed (AmmoniteFile *file,
+                      gboolean      unconfirmed)
+{
+    AmmoniteDirectory *directory;
+
+    g_assert (AMMONITE_IS_FILE (file));
+    g_assert (unconfirmed == FALSE || unconfirmed == TRUE);
+
+    if (file->details->unconfirmed == unconfirmed)
+    {
+        return;
+    }
+    file->details->unconfirmed = unconfirmed;
+
+    directory = file->details->directory;
+    if (unconfirmed)
+    {
+        directory->details->confirmed_file_count--;
+    }
+    else
+    {
+        directory->details->confirmed_file_count++;
+    }
+}
+
+static gboolean show_hidden_files = TRUE;
+
+static void
+show_hidden_files_changed_callback (gpointer callback_data)
+{
+    show_hidden_files = g_settings_get_boolean (gtk_filechooser_preferences, AMMONITE_PREFERENCES_SHOW_HIDDEN_FILES);
+}
+
+static gboolean
+should_skip_file (GFileInfo *info)
+{
+    static gboolean show_hidden_files_changed_callback_installed = FALSE;
+
+    /* Add the callback once for the life of our process */
+    if (!show_hidden_files_changed_callback_installed)
+    {
+        g_signal_connect_swapped (gtk_filechooser_preferences,
+                                  "changed::" AMMONITE_PREFERENCES_SHOW_HIDDEN_FILES,
+                                  G_CALLBACK (show_hidden_files_changed_callback),
+                                  NULL);
+
+        show_hidden_files_changed_callback_installed = TRUE;
+
+        /* Peek for the first time */
+        show_hidden_files_changed_callback (NULL);
+    }
+
+    if (!show_hidden_files)
+    {
+        return g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_STANDARD_IS_HIDDEN) ||
+               g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_STANDARD_IS_BACKUP);
+    }
+
+    return FALSE;
+}
+
+static void
+notify_files_changed_while_being_added (AmmoniteDirectory *directory)
+{
+    if (directory->details->files_changed_while_adding == NULL)
+    {
+        return;
+    }
+
+    directory->details->files_changed_while_adding =
+        g_list_reverse (directory->details->files_changed_while_adding);
+
+    ammonite_directory_notify_files_changed (directory->details->files_changed_while_adding);
+
+    g_clear_list (&directory->details->files_changed_while_adding, g_object_unref);
+}
+
+static gboolean
+dequeue_pending_idle_callback (gpointer callback_data)
+{
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_ref (callback_data);
+    GList *node, *next;
+    AmmoniteFile *file;
+    GList *changed_files, *added_files;
+    GFileInfo *file_info;
+    const char *name;
+    DirectoryLoadState *dir_load_state;
+
+    directory->details->dequeue_pending_idle_id = 0;
+
+    /* Handle the files in the order we saw them. */
+    g_autolist (GFileInfo) pending_file_info =
+        g_list_reverse (g_steal_pointer (&directory->details->pending_file_info));
+
+    /* If we are no longer monitoring, then throw away these. */
+    if (!ammonite_directory_is_file_list_monitored (directory))
+    {
+        ammonite_directory_async_state_changed (directory);
+
+        return G_SOURCE_REMOVE;
+    }
+
+    added_files = NULL;
+    changed_files = NULL;
+
+    dir_load_state = directory->details->directory_load_in_progress;
+
+    /* Build a list of AmmoniteFile objects. */
+    for (node = pending_file_info; node != NULL; node = node->next)
+    {
+        file_info = node->data;
+
+        name = g_file_info_get_name (file_info);
+
+        /* Update the file count. */
+        /* FIXME bugzilla.gnome.org 45063: This could count a
+         * file twice if we get it from both load_directory
+         * and from new_files_callback. Not too hard to fix by
+         * moving this into the actual callback instead of
+         * waiting for the idle function.
+         */
+        if (dir_load_state && !should_skip_file (file_info))
+        {
+            dir_load_state->load_file_count += 1;
+        }
+
+        /* check if the file already exists */
+        file = ammonite_directory_find_file_by_name (directory, name);
+        if (file != NULL)
+        {
+            /* file already exists in dir, check if we still need to
+             *  emit file_added or if it changed */
+            set_file_unconfirmed (file, FALSE);
+            if (!file->details->is_added)
+            {
+                /* We consider this newly added even if its in the list.
+                 * This can happen if someone called ammonite_file_get_by_uri()
+                 * on a file in the folder before the add signal was
+                 * emitted */
+                ammonite_file_ref (file);
+                file->details->is_added = TRUE;
+                added_files = g_list_prepend (added_files, file);
+            }
+            else if (ammonite_file_update_info (file, file_info))
+            {
+                /* File changed, notify about the change. */
+                ammonite_file_ref (file);
+                changed_files = g_list_prepend (changed_files, file);
+            }
+        }
+        else
+        {
+            /* new file, create a ammonite file object and add it to the list */
+            file = ammonite_file_new_from_info (directory, file_info);
+            ammonite_directory_add_file (directory, file);
+            file->details->is_added = TRUE;
+            added_files = g_list_prepend (added_files, file);
+        }
+    }
+
+    /* If we are done loading, then we assume that any unconfirmed
+     * files are gone.
+     */
+    if (directory->details->directory_loaded)
+    {
+        for (node = directory->details->file_list;
+             node != NULL; node = next)
+        {
+            file = AMMONITE_FILE (node->data);
+            next = node->next;
+
+            if (file->details->unconfirmed)
+            {
+                ammonite_file_ref (file);
+                changed_files = g_list_prepend (changed_files, file);
+
+                ammonite_file_mark_gone (file);
+            }
+        }
+    }
+
+    /* Send the changed and added signals. */
+    ammonite_directory_emit_change_signals (directory, changed_files);
+    ammonite_file_list_free (changed_files);
+    ammonite_directory_emit_files_added (directory, added_files);
+    ammonite_file_list_free (added_files);
+
+    if (directory->details->directory_loaded &&
+        !directory->details->directory_loaded_sent_notification)
+    {
+        /* Send the done_loading signal. */
+        ammonite_directory_emit_done_loading (directory);
+
+        if (dir_load_state)
+        {
+            file = dir_load_state->load_directory_file;
+
+            file->details->directory_count = dir_load_state->load_file_count;
+            file->details->directory_count_is_up_to_date = TRUE;
+            file->details->got_directory_count = TRUE;
+
+            ammonite_file_changed (file);
+        }
+
+        ammonite_directory_async_state_changed (directory);
+
+        directory->details->directory_loaded_sent_notification = TRUE;
+    }
+
+    /* Process changes received for files while they were still being added.
+     * See Bug 703179 and issue #1576 for a situation this happens. */
+    notify_files_changed_while_being_added (directory);
+
+    /* Get the state machine running again. */
+    ammonite_directory_async_state_changed (directory);
+
+    return G_SOURCE_REMOVE;
+}
+
+void
+ammonite_directory_schedule_dequeue_pending (AmmoniteDirectory *directory)
+{
+    if (directory->details->dequeue_pending_idle_id == 0)
+    {
+        directory->details->dequeue_pending_idle_id
+            = g_idle_add (dequeue_pending_idle_callback, directory);
+    }
+}
+
+static void
+directory_load_one (AmmoniteDirectory *directory,
+                    GFileInfo         *info)
+{
+    if (info == NULL)
+    {
+        return;
+    }
+
+    if (g_file_info_get_name (info) == NULL)
+    {
+        char *uri;
+
+        uri = ammonite_directory_get_uri (directory);
+        g_warning ("Got GFileInfo with NULL name in %s, ignoring. This shouldn't happen unless the gvfs backend is broken.\n", uri);
+        g_free (uri);
+
+        return;
+    }
+
+    /* Arrange for the "loading" part of the work. */
+    g_object_ref (info);
+    directory->details->pending_file_info
+        = g_list_prepend (directory->details->pending_file_info, info);
+    ammonite_directory_schedule_dequeue_pending (directory);
+}
+
+static void
+directory_load_cancel (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+    DirectoryLoadState *state;
+
+    state = directory->details->directory_load_in_progress;
+    if (state != NULL)
+    {
+        file = state->load_directory_file;
+        file->details->loading_directory = FALSE;
+        if (file->details->directory != directory)
+        {
+            ammonite_directory_async_state_changed (file->details->directory);
+        }
+
+        g_cancellable_cancel (state->cancellable);
+        state->directory = NULL;
+        directory->details->directory_load_in_progress = NULL;
+        async_job_end (directory, "file list");
+    }
+}
+
+static void
+file_list_cancel (AmmoniteDirectory *directory)
+{
+    directory_load_cancel (directory);
+
+    if (directory->details->dequeue_pending_idle_id != 0)
+    {
+        g_source_remove (directory->details->dequeue_pending_idle_id);
+        directory->details->dequeue_pending_idle_id = 0;
+    }
+
+    if (directory->details->pending_file_info != NULL)
+    {
+        g_list_free_full (directory->details->pending_file_info, g_object_unref);
+        directory->details->pending_file_info = NULL;
+    }
+}
+
+static void
+directory_load_done (AmmoniteDirectory *directory,
+                     GError            *error)
+{
+    GList *node;
+
+    g_object_ref (directory);
+
+    directory->details->directory_loaded = TRUE;
+    directory->details->directory_loaded_sent_notification = FALSE;
+
+    if (error != NULL)
+    {
+        /* The load did not complete successfully. This means
+         * we don't know the status of the files in this directory.
+         * We clear the unconfirmed bit on each file here so that
+         * they won't be marked "gone" later -- we don't know enough
+         * about them to know whether they are really gone.
+         */
+        for (node = directory->details->file_list;
+             node != NULL; node = node->next)
+        {
+            set_file_unconfirmed (AMMONITE_FILE (node->data), FALSE);
+        }
+
+        ammonite_directory_emit_load_error (directory, error);
+    }
+
+    /* Call the idle function right away. */
+    if (directory->details->dequeue_pending_idle_id != 0)
+    {
+        g_source_remove (directory->details->dequeue_pending_idle_id);
+    }
+    dequeue_pending_idle_callback (directory);
+
+    directory_load_cancel (directory);
+
+    g_object_unref (directory);
+}
+
+void
+ammonite_directory_monitor_remove_internal (AmmoniteDirectory *directory,
+                                            AmmoniteFile      *file,
+                                            gconstpointer      client)
+{
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+    g_assert (file == NULL || AMMONITE_IS_FILE (file));
+    g_assert (client != NULL);
+
+    remove_monitor (directory, file, client);
+
+    if (directory->details->monitor != NULL
+        && g_hash_table_size (directory->details->monitor_table) == 0)
+    {
+        ammonite_monitor_cancel (directory->details->monitor);
+        directory->details->monitor = NULL;
+    }
+
+    /* XXX - do we need to remove anything from the work queue? */
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+FileMonitors *
+ammonite_directory_remove_file_monitors (AmmoniteDirectory *directory,
+                                         AmmoniteFile      *file)
+{
+    GList *result, *node;
+    Monitor *monitor;
+
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+    g_assert (AMMONITE_IS_FILE (file));
+    g_assert (file->details->directory == directory);
+
+    result = g_hash_table_lookup (directory->details->monitor_table, file);
+
+    if (result != NULL)
+    {
+        g_hash_table_remove (directory->details->monitor_table, file);
+
+        for (node = result; node; node = node->next)
+        {
+            monitor = node->data;
+            request_counter_remove (directory->details->monitor_counters,
+                                    monitor->attributes);
+        }
+        result = g_list_reverse (result);
+    }
+
+    /* XXX - do we need to remove anything from the work queue? */
+
+    ammonite_directory_async_state_changed (directory);
+
+    return (FileMonitors *) result;
+}
+
+void
+ammonite_directory_add_file_monitors (AmmoniteDirectory *directory,
+                                      AmmoniteFile      *file,
+                                      FileMonitors      *monitors)
+{
+    GList *l;
+    Monitor *monitor;
+
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+    g_assert (AMMONITE_IS_FILE (file));
+    g_assert (file->details->directory == directory);
+
+    if (monitors == NULL)
+    {
+        return;
+    }
+
+    for (l = (GList *) monitors; l != NULL; l = l->next)
+    {
+        monitor = l->data;
+
+        remove_monitor (directory, monitor->file, monitor->client);
+        insert_new_monitor (directory, monitor);
+    }
+
+    g_list_free ((GList *) monitors);
+
+    ammonite_directory_add_file_to_work_queue (directory, file);
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+static int
+ready_callback_key_compare (gconstpointer a,
+                            gconstpointer b)
+{
+    const ReadyCallback *callback_a = a;
+    const ReadyCallback *callback_b = b;
+
+    if (callback_a->file != callback_b->file)
+    {
+        return -1;
+    }
+
+    if (callback_a->file == NULL ?
+        (callback_a->callback.directory != callback_b->callback.directory) :
+        (callback_a->callback.file != callback_b->callback.file))
+    {
+        return -1;
+    }
+
+    if (callback_a->callback_data != callback_b->callback_data)
+    {
+        return -1;
+    }
+
+    /* It's a match */
+    return 0;
+}
+
+static void
+ready_callback_call (AmmoniteDirectory   *directory,
+                     const ReadyCallback *callback)
+{
+    GList *file_list;
+
+    /* Call the callback. */
+    if (callback->file != NULL)
+    {
+        if (callback->callback.file)
+        {
+            (*callback->callback.file)(callback->file,
+                                       callback->callback_data);
+        }
+    }
+    else if (callback->callback.directory != NULL)
+    {
+        if (directory == NULL ||
+            !(IS_ATTRIBUTE_SET (callback->attributes, AMMONITE_ATTRIBUTE_FILE_LIST)))
+        {
+            file_list = NULL;
+        }
+        else
+        {
+            file_list = ammonite_directory_get_file_list (directory);
+        }
+
+        /* Pass back the file list if the user was waiting for it. */
+        (*callback->callback.directory)(directory,
+                                        file_list,
+                                        callback->callback_data);
+
+        ammonite_file_list_free (file_list);
+    }
+}
+
+void
+ammonite_directory_call_when_ready_internal (AmmoniteDirectory         *directory,
+                                             AmmoniteFile              *file,
+                                             AmmoniteAttributes         attributes,
+                                             AmmoniteDirectoryCallback  directory_callback,
+                                             AmmoniteFileCallback       file_callback,
+                                             gpointer                   callback_data)
+{
+    ReadyCallback callback;
+    GList *node;
+
+    g_assert (directory == NULL || AMMONITE_IS_DIRECTORY (directory));
+    g_assert (file == NULL || AMMONITE_IS_FILE (file));
+    g_assert (file != NULL || directory_callback != NULL);
+
+    /* Construct a callback object. */
+    callback.file = file;
+    if (file == NULL)
+    {
+        callback.callback.directory = directory_callback;
+    }
+    else
+    {
+        callback.callback.file = file_callback;
+    }
+    callback.callback_data = callback_data;
+    callback.attributes = attributes;
+
+    /* Handle the NULL case. */
+    if (directory == NULL)
+    {
+        ready_callback_call (NULL, &callback);
+        return;
+    }
+
+    /* Check if the callback is already there. */
+    node = g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, callback.file);
+
+    if (g_list_find_custom (node, &callback, ready_callback_key_compare) != NULL)
+    {
+        if (file_callback != NULL || directory_callback != NULL)
+        {
+            g_autofree char *uri = file != NULL
+                                   ? ammonite_file_get_uri (file)
+                                   : ammonite_directory_get_uri (directory);
+            g_warning ("Tried to add a duplicate callback for '%s'. "
+                       "Make sure to cancel previous callback", uri);
+        }
+        /* NULL callback means, just read it. Conflicts are ok. */
+        return;
+    }
+
+    /* Add the new callback to the list. */
+    node = g_list_prepend (node, g_memdup2 (&callback, sizeof (callback)));
+    g_hash_table_replace (directory->details->call_when_ready_hash.unsatisfied, callback.file, node);
+    request_counter_add (directory->details->call_when_ready_counters,
+                         callback.attributes);
+
+    /* Put the callback file or all the files on the work queue. */
+    if (file != NULL)
+    {
+        ammonite_directory_add_file_to_work_queue (directory, file);
+    }
+    else
+    {
+        add_all_files_to_work_queue (directory);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+gboolean
+ammonite_directory_check_if_ready_internal (AmmoniteDirectory  *directory,
+                                            AmmoniteFile       *file,
+                                            AmmoniteAttributes  attributes)
+{
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+
+    return all_attributes_available (directory, file, attributes);
+}
+
+static GList *
+remove_callback_link (AmmoniteDirectory *directory,
+                      GList             *link,
+                      gboolean           ready)
+{
+    ReadyCallback *callback = link->data;
+    GList *list = g_list_first (link);
+    gboolean is_first_link = (list == link);
+
+    list = g_list_delete_link (list, link);
+
+    if (is_first_link)
+    {
+        GHashTable *hash = ready ? directory->details->call_when_ready_hash.ready :
+                                   directory->details->call_when_ready_hash.unsatisfied;
+
+        if (list != NULL)
+        {
+            g_hash_table_replace (hash, callback->file, list);
+        }
+        else
+        {
+            g_hash_table_remove (hash, callback->file);
+        }
+    }
+
+    request_counter_remove (directory->details->call_when_ready_counters,
+                            callback->attributes);
+
+    g_free (callback);
+
+    return list;
+}
+
+static void
+remove_similar_callbacks (AmmoniteDirectory *directory,
+                          ReadyCallback     *callback)
+{
+    gboolean changed = FALSE;
+    GList *list, *node;
+
+    /* Remove all queued ready callbacks */
+    list = g_hash_table_lookup (directory->details->call_when_ready_hash.ready, callback->file);
+    while ((node = g_list_find_custom (list, callback, ready_callback_key_compare)) != NULL)
+    {
+        list = remove_callback_link (directory, node, TRUE);
+        changed = TRUE;
+    }
+
+    /* Remove all queued unsatisfied callbacks */
+    list = g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, callback->file);
+    while ((node = g_list_find_custom (list, callback, ready_callback_key_compare)) != NULL)
+    {
+        list = remove_callback_link (directory, node, FALSE);
+        changed = TRUE;
+    }
+
+    if (changed)
+    {
+        ammonite_directory_async_state_changed (directory);
+    }
+}
+
+void
+ammonite_directory_cancel_callback_internal (AmmoniteDirectory         *directory,
+                                             AmmoniteFile              *file,
+                                             AmmoniteDirectoryCallback  directory_callback,
+                                             AmmoniteFileCallback       file_callback,
+                                             gpointer                   callback_data)
+{
+    ReadyCallback callback;
+
+    if (directory == NULL)
+    {
+        return;
+    }
+
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+    g_assert (file == NULL || AMMONITE_IS_FILE (file));
+    g_assert (file != NULL || directory_callback != NULL);
+    g_assert (file == NULL || file_callback != NULL);
+
+    /* Construct a callback object. */
+    callback.file = file;
+    if (file == NULL)
+    {
+        callback.callback.directory = directory_callback;
+    }
+    else
+    {
+        callback.callback.file = file_callback;
+    }
+    callback.callback_data = callback_data;
+
+    remove_similar_callbacks (directory, &callback);
+}
+
+static void
+new_files_state_unref (NewFilesState *state)
+{
+    state->count--;
+
+    if (state->count == 0)
+    {
+        if (state->directory)
+        {
+            state->directory->details->new_files_in_progress =
+                g_list_remove (state->directory->details->new_files_in_progress,
+                               state);
+        }
+
+        g_object_unref (state->cancellable);
+        g_free (state);
+    }
+}
+
+static void
+new_files_callback (GObject      *source_object,
+                    GAsyncResult *res,
+                    gpointer      user_data)
+{
+    AmmoniteDirectory *directory;
+    GFileInfo *info;
+    NewFilesState *state;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        new_files_state_unref (state);
+        return;
+    }
+
+    directory = ammonite_directory_ref (state->directory);
+
+    /* Queue up the new file. */
+    info = g_file_query_info_finish (G_FILE (source_object), res, NULL);
+    if (info != NULL)
+    {
+        directory_load_one (directory, info);
+        g_object_unref (info);
+    }
+
+    new_files_state_unref (state);
+
+    ammonite_directory_unref (directory);
+}
+
+void
+ammonite_directory_get_info_for_new_files (AmmoniteDirectory *directory,
+                                           GList             *location_list)
+{
+    NewFilesState *state;
+    GFile *location;
+    GList *l;
+
+    if (location_list == NULL)
+    {
+        return;
+    }
+
+    state = g_new (NewFilesState, 1);
+    state->directory = directory;
+    state->cancellable = g_cancellable_new ();
+    state->count = 0;
+
+    for (l = location_list; l != NULL; l = l->next)
+    {
+        location = l->data;
+
+        state->count++;
+
+        g_file_query_info_async (location,
+                                 AMMONITE_FILE_DEFAULT_ATTRIBUTES,
+                                 G_FILE_QUERY_INFO_NONE,
+                                 G_PRIORITY_DEFAULT,
+                                 state->cancellable,
+                                 new_files_callback, state);
+    }
+
+    directory->details->new_files_in_progress
+        = g_list_prepend (directory->details->new_files_in_progress,
+                          state);
+}
+
+void
+ammonite_async_destroying_file (AmmoniteFile *file)
+{
+    AmmoniteDirectory *directory = file->details->directory;
+    gboolean changed = FALSE;
+    GList *node;
+
+    /* Check for callbacks. */
+    node = g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, file);
+
+    if (node != NULL)
+    {
+        /* Client should have cancelled callback. */
+        g_warning ("destroyed file has call_when_ready pending");
+        changed = TRUE;
+
+        while (node != NULL)
+        {
+            node = remove_callback_link (directory, node, FALSE);
+        }
+    }
+
+    node = g_hash_table_lookup (directory->details->call_when_ready_hash.ready, file);
+
+    while (node != NULL)
+    {
+        node = remove_callback_link (directory, node, TRUE);
+        changed = TRUE;
+    }
+
+    /* Check for monitors. */
+    node = g_hash_table_lookup (directory->details->monitor_table, file);
+    if (node != NULL)
+    {
+        /* Client should have removed monitor earlier. */
+        g_warning ("destroyed file still being monitored");
+
+        while (node != NULL)
+        {
+            Monitor *monitor = node->data;
+            node = node->next;
+            remove_monitor (directory, monitor->file, monitor->client);
+        }
+        changed = TRUE;
+    }
+
+    /* Check if it's a file that's currently being worked on.
+     * If so, make that NULL so it gets canceled right away.
+     */
+    if (directory->details->count_in_progress != NULL &&
+        directory->details->count_in_progress->count_file == file)
+    {
+        directory->details->count_in_progress->count_file = NULL;
+        changed = TRUE;
+    }
+    if (directory->details->deep_count_file == file)
+    {
+        directory->details->deep_count_file = NULL;
+        changed = TRUE;
+    }
+    if (directory->details->get_info_file == file)
+    {
+        directory->details->get_info_file = NULL;
+        changed = TRUE;
+    }
+    if (directory->details->extension_info_file == file)
+    {
+        directory->details->extension_info_file = NULL;
+        changed = TRUE;
+    }
+
+    if (directory->details->thumbnail_info_state != NULL &&
+        directory->details->thumbnail_info_state->file == file)
+    {
+        directory->details->thumbnail_info_state->file = NULL;
+        changed = TRUE;
+    }
+
+    if (directory->details->thumbnail_buf_state != NULL &&
+        directory->details->thumbnail_buf_state->file == file)
+    {
+        directory->details->thumbnail_buf_state->file = NULL;
+        changed = TRUE;
+    }
+
+    if (directory->details->mount_state != NULL &&
+        directory->details->mount_state->file == file)
+    {
+        directory->details->mount_state->file = NULL;
+        changed = TRUE;
+    }
+
+    if (directory->details->filesystem_info_state != NULL &&
+        directory->details->filesystem_info_state->file == file)
+    {
+        directory->details->filesystem_info_state->file = NULL;
+        changed = TRUE;
+    }
+
+    /* Let the directory take care of the rest. */
+    if (changed)
+    {
+        ammonite_directory_async_state_changed (directory);
+    }
+}
+
+static gboolean
+lacks_directory_count (AmmoniteFile *file)
+{
+    return !file->details->directory_count_is_up_to_date
+           && ammonite_file_should_show_directory_item_count (file);
+}
+
+static gboolean
+should_get_directory_count_now (AmmoniteFile *file)
+{
+    return !file->details->loading_directory &&
+           lacks_directory_count (file);
+}
+
+static gboolean
+lacks_info (AmmoniteFile *file)
+{
+    return !file->details->file_info_is_up_to_date
+           && !file->details->is_gone;
+}
+
+static gboolean
+lacks_filesystem_info (AmmoniteFile *file)
+{
+    return !file->details->filesystem_info_is_up_to_date;
+}
+
+static gboolean
+lacks_deep_count (AmmoniteFile *file)
+{
+    return file->details->deep_counts_status != AMMONITE_REQUEST_DONE;
+}
+
+static gboolean
+lacks_extension_info (AmmoniteFile *file)
+{
+    return file->details->pending_info_providers != NULL;
+}
+
+static gboolean
+lacks_thumbnail_info (AmmoniteFile *file)
+{
+    return !file->details->thumbnail_info_is_up_to_date;
+}
+
+static gboolean
+lacks_thumbnail_buf (AmmoniteFile *file)
+{
+    return file->details->thumbnail_info_is_up_to_date &&
+           file->details->thumbnail_path != NULL &&
+           !file->details->thumbnail_is_up_to_date &&
+           ammonite_file_should_show_thumbnail (file);
+}
+
+static gboolean
+lacks_mount (AmmoniteFile *file)
+{
+    return (!file->details->mount_is_up_to_date &&
+            (
+                /* Unix mountpoint, could be a GMount */
+                file->details->is_mountpoint ||
+
+                /* The toplevel directory of something */
+                (file->details->type == G_FILE_TYPE_DIRECTORY &&
+                 ammonite_file_is_self_owned (file)) ||
+
+                /* Mountable, could be a mountpoint */
+                (file->details->type == G_FILE_TYPE_MOUNTABLE)
+
+            )
+            );
+}
+
+static gboolean
+has_problem (AmmoniteDirectory *directory,
+             AmmoniteFile      *file,
+             FileCheck          problem)
+{
+    GList *node;
+
+    if (file != NULL)
+    {
+        return (*problem)(file);
+    }
+
+    for (node = directory->details->file_list; node != NULL; node = node->next)
+    {
+        if ((*problem)(node->data))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static gboolean
+all_attributes_available (AmmoniteDirectory  *directory,
+                          AmmoniteFile       *file,
+                          AmmoniteAttributes  attributes)
+{
+    if ((IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_FILE_LIST)) &&
+        !(directory->details->directory_loaded &&
+          directory->details->directory_loaded_sent_notification))
+    {
+        return FALSE;
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT))
+    {
+        if (has_problem (directory, file, lacks_directory_count))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_INFO))
+    {
+        if (has_problem (directory, file, lacks_info))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_FILESYSTEM_INFO))
+    {
+        if (has_problem (directory, file, lacks_filesystem_info))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DEEP_COUNT))
+    {
+        if (has_problem (directory, file, lacks_deep_count))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_INFO))
+    {
+        if (has_problem (directory, file, lacks_thumbnail_info))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_BUFFER))
+    {
+        if (has_problem (directory, file, lacks_thumbnail_buf))
+        {
+            return FALSE;
+        }
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_MOUNT))
+    {
+        if (has_problem (directory, file, lacks_mount))
+        {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
+
+static void
+call_ready_callbacks_at_idle (gpointer callback_data)
+{
+    /* Ensure the directory is alive until the end of this scope */
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_ref (AMMONITE_DIRECTORY (callback_data));
+    GHashTableIter hash_iter;
+    GList *node;
+
+    directory->details->call_ready_idle_id = 0;
+
+    if (g_hash_table_size (directory->details->call_when_ready_hash.ready) == 0)
+    {
+        /* Return early in case all ready callbacks were cancelled, don't emit state change */
+        return;
+    }
+
+    g_hash_table_iter_init (&hash_iter, directory->details->call_when_ready_hash.ready);
+
+    /* Check if any callbacks are ready and call them if they are. */
+    while (g_hash_table_iter_next (&hash_iter, NULL, (gpointer *) &node))
+    {
+        ReadyCallback callback = *(ReadyCallback *) (node->data);
+
+        /* Callbacks are one-shots, so remove it now. */
+        remove_callback_link (directory, node, TRUE);
+
+        /* Call the callback. */
+        ready_callback_call (directory, &callback);
+
+        /* Need to parse the node from the hash table again because it might
+         * have been freed */
+        g_hash_table_iter_init (&hash_iter, directory->details->call_when_ready_hash.ready);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+static void
+schedule_call_ready_callbacks (AmmoniteDirectory *directory)
+{
+    if (directory->details->call_ready_idle_id == 0)
+    {
+        directory->details->call_ready_idle_id
+            = g_idle_add_once (call_ready_callbacks_at_idle, directory);
+    }
+}
+
+/* Moves all the callbacks that are ready from the unsatisfied hash table
+ * to the ready hash table and schedules them to be called at idle, unless
+ * they are removed before then */
+static gboolean
+call_ready_callbacks (AmmoniteDirectory *directory)
+{
+    GHashTable *ready_hash = directory->details->call_when_ready_hash.ready;
+    GHashTable *unsatisfied_hash = directory->details->call_when_ready_hash.unsatisfied;
+    g_autoptr (GPtrArray) unsatisfied_callbacks = g_hash_table_get_values_as_ptr_array (unsatisfied_hash);
+    gboolean found_any = FALSE;
+
+    /* Check if any callbacks are satisfied and mark them for call them if they are. */
+    for (guint i = 0; i < unsatisfied_callbacks->len; i++)
+    {
+        GList *unsatisfied_list = unsatisfied_callbacks->pdata[i];
+        GList *ready_list = NULL;
+        GList *next;
+        AmmoniteFile *callback_file = NULL;
+        gboolean satisfied_callbacks = FALSE;
+
+        for (GList *node = unsatisfied_list; node != NULL; node = next)
+        {
+            next = node->next;
+            ReadyCallback *callback = node->data;
+
+            if (!all_attributes_available (directory, callback->file, callback->attributes))
+            {
+                continue;
+            }
+
+            if (!satisfied_callbacks)
+            {
+                ready_list = g_hash_table_lookup (ready_hash, callback->file);
+                callback_file = callback->file;
+                satisfied_callbacks = TRUE;
+            }
+
+            /* Move callback from unready list to ready list */
+            unsatisfied_list = g_list_delete_link (unsatisfied_list, node);
+            ready_list = g_list_prepend (ready_list, callback);
+        }
+
+        if (satisfied_callbacks)
+        {
+            g_hash_table_replace (ready_hash, callback_file, ready_list);
+
+            if (unsatisfied_list != NULL)
+            {
+                g_hash_table_replace (unsatisfied_hash, callback_file, unsatisfied_list);
+            }
+            else
+            {
+                g_hash_table_remove (unsatisfied_hash, callback_file);
+            }
+
+            found_any = TRUE;
+        }
+    }
+
+    if (found_any)
+    {
+        schedule_call_ready_callbacks (directory);
+    }
+
+    return found_any;
+}
+
+static GList *
+lookup_monitors (GHashTable   *monitor_table,
+                 AmmoniteFile *file)
+{
+    /* To find monitors monitoring all files, use lookup_all_files_monitors. */
+    g_return_val_if_fail (file, NULL);
+
+    return g_hash_table_lookup (monitor_table, file);
+}
+
+static GList *
+lookup_all_files_monitors (GHashTable *monitor_table)
+{
+    /* monitor->file == NULL means monitor all files. */
+    return g_hash_table_lookup (monitor_table, NULL);
+}
+
+gboolean
+ammonite_directory_has_request_for_file (AmmoniteDirectory *directory,
+                                         AmmoniteFile      *file)
+{
+    if (g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, NULL) != NULL ||
+        g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, file) != NULL ||
+        g_hash_table_lookup (directory->details->call_when_ready_hash.ready, NULL) != NULL ||
+        g_hash_table_lookup (directory->details->call_when_ready_hash.ready, file) != NULL)
+    {
+        return TRUE;
+    }
+
+    if (lookup_monitors (directory->details->monitor_table, file) != NULL)
+    {
+        return TRUE;
+    }
+    if (lookup_all_files_monitors (directory->details->monitor_table) != NULL)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+
+/* This checks if there's a request for monitoring the file list. */
+gboolean
+ammonite_directory_is_anyone_monitoring_file_list (AmmoniteDirectory *directory)
+{
+    if (request_counter_has (directory->details->call_when_ready_counters,
+                             AMMONITE_ATTRIBUTE_FILE_LIST))
+    {
+        return TRUE;
+    }
+
+    if (request_counter_has (directory->details->monitor_counters,
+                             AMMONITE_ATTRIBUTE_FILE_LIST))
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/* This checks if the file list being monitored. */
+gboolean
+ammonite_directory_is_file_list_monitored (AmmoniteDirectory *directory)
+{
+    return directory->details->file_list_monitored;
+}
+
+static void
+mark_all_files_unconfirmed (AmmoniteDirectory *directory)
+{
+    GList *node;
+    AmmoniteFile *file;
+
+    for (node = directory->details->file_list; node != NULL; node = node->next)
+    {
+        file = node->data;
+        set_file_unconfirmed (file, TRUE);
+    }
+}
+
+static void
+directory_load_state_free (DirectoryLoadState *state)
+{
+    if (state->enumerator)
+    {
+        if (!g_file_enumerator_is_closed (state->enumerator))
+        {
+            g_file_enumerator_close_async (state->enumerator,
+                                           0, NULL, NULL, NULL);
+        }
+        g_object_unref (state->enumerator);
+    }
+
+    ammonite_file_unref (state->load_directory_file);
+    g_object_unref (state->cancellable);
+    g_free (state);
+}
+
+static void
+more_files_callback (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+{
+    DirectoryLoadState *state;
+    AmmoniteDirectory *directory;
+    GError *error;
+    GList *files, *l;
+    GFileInfo *info;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        directory_load_state_free (state);
+        return;
+    }
+
+    directory = ammonite_directory_ref (state->directory);
+
+    g_assert (directory->details->directory_load_in_progress != NULL);
+    g_assert (directory->details->directory_load_in_progress == state);
+
+    error = NULL;
+    files = g_file_enumerator_next_files_finish (state->enumerator,
+                                                 res, &error);
+
+    for (l = files; l != NULL; l = l->next)
+    {
+        info = l->data;
+        directory_load_one (directory, info);
+        g_object_unref (info);
+    }
+
+    if (files == NULL)
+    {
+        directory_load_done (directory, error);
+        directory_load_state_free (state);
+    }
+    else
+    {
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_DEFAULT,
+                                            state->cancellable,
+                                            more_files_callback,
+                                            state);
+    }
+
+    ammonite_directory_unref (directory);
+
+    if (error)
+    {
+        g_error_free (error);
+    }
+
+    g_list_free (files);
+}
+
+static void
+enumerate_children_callback (GObject      *source_object,
+                             GAsyncResult *res,
+                             gpointer      user_data)
+{
+    DirectoryLoadState *state;
+    GFileEnumerator *enumerator;
+    GError *error;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        directory_load_state_free (state);
+        return;
+    }
+
+    error = NULL;
+    enumerator = g_file_enumerate_children_finish (G_FILE (source_object),
+                                                   res, &error);
+
+    if (enumerator == NULL)
+    {
+        directory_load_done (state->directory, error);
+        g_error_free (error);
+        directory_load_state_free (state);
+        return;
+    }
+    else
+    {
+        state->enumerator = enumerator;
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_DEFAULT,
+                                            state->cancellable,
+                                            more_files_callback,
+                                            state);
+    }
+}
+
+
+/* Start monitoring the file list if it isn't already. */
+static void
+start_monitoring_file_list (AmmoniteDirectory *directory)
+{
+    DirectoryLoadState *state;
+
+    if (!directory->details->file_list_monitored)
+    {
+        g_assert (!directory->details->directory_load_in_progress);
+        directory->details->file_list_monitored = TRUE;
+        g_list_foreach (directory->details->file_list, (GFunc) ammonite_file_ref, NULL);
+    }
+
+    if (directory->details->directory_loaded ||
+        directory->details->directory_load_in_progress != NULL)
+    {
+        return;
+    }
+
+    if (!async_job_start (directory, "file list"))
+    {
+        return;
+    }
+
+    mark_all_files_unconfirmed (directory);
+
+    state = g_new0 (DirectoryLoadState, 1);
+    state->directory = directory;
+    state->cancellable = g_cancellable_new ();
+    state->load_file_count = 0;
+
+    g_assert (directory->details->location != NULL);
+    state->load_directory_file =
+        ammonite_directory_get_corresponding_file (directory);
+    state->load_directory_file->details->loading_directory = TRUE;
+
+
+    g_debug ("load_directory called to monitor file list of %p", directory->details->location);
+
+    directory->details->directory_load_in_progress = state;
+
+    g_file_enumerate_children_async (directory->details->location,
+                                     AMMONITE_FILE_DEFAULT_ATTRIBUTES,
+                                     0,     /* flags */
+                                     G_PRIORITY_DEFAULT,     /* prio */
+                                     state->cancellable,
+                                     enumerate_children_callback,
+                                     state);
+}
+
+/* Stop monitoring the file list if it is being monitored. */
+void
+ammonite_directory_stop_monitoring_file_list (AmmoniteDirectory *directory)
+{
+    if (!directory->details->file_list_monitored)
+    {
+        g_assert (directory->details->directory_load_in_progress == NULL);
+        return;
+    }
+
+    directory->details->file_list_monitored = FALSE;
+    file_list_cancel (directory);
+    g_list_foreach (directory->details->file_list, (GFunc) ammonite_file_unref, NULL);
+    directory->details->directory_loaded = FALSE;
+}
+
+static void
+file_list_start_or_stop (AmmoniteDirectory *directory)
+{
+    if (ammonite_directory_is_anyone_monitoring_file_list (directory))
+    {
+        start_monitoring_file_list (directory);
+    }
+    else
+    {
+        ammonite_directory_stop_monitoring_file_list (directory);
+    }
+}
+
+void
+ammonite_file_invalidate_count (AmmoniteFile *file)
+{
+    ammonite_file_invalidate_attributes (file, AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT);
+}
+
+
+/* Reset count. Invalidating deep counts is handled by
+ * itself elsewhere because it's a relatively heavyweight and
+ * special-purpose operation (see bug 5863). Also, the shallow count
+ * needs to be refreshed when filtering changes, but the deep count
+ * deliberately does not take filtering into account.
+ */
+void
+ammonite_directory_invalidate_count (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    file = ammonite_directory_get_existing_corresponding_file (directory);
+    if (file != NULL)
+    {
+        ammonite_file_invalidate_count (file);
+    }
+
+    ammonite_file_unref (file);
+}
+
+static void
+ammonite_directory_invalidate_attributes (AmmoniteDirectory  *directory,
+                                          AmmoniteAttributes  attributes)
+{
+    GList *node;
+
+    cancel_loading_attributes (directory, attributes);
+
+    for (node = directory->details->file_list; node != NULL; node = node->next)
+    {
+        ammonite_file_invalidate_attributes_internal (AMMONITE_FILE (node->data),
+                                                      attributes);
+    }
+
+    if (directory->details->as_file != NULL)
+    {
+        ammonite_file_invalidate_attributes_internal (directory->details->as_file,
+                                                      attributes);
+    }
+}
+
+void
+ammonite_directory_force_reload_internal (AmmoniteDirectory  *directory,
+                                          AmmoniteAttributes  attributes)
+{
+    /* invalidate attributes that are getting reloaded for all files */
+    ammonite_directory_invalidate_attributes (directory, attributes);
+
+    /* Start a new directory load. */
+    file_list_cancel (directory);
+    directory->details->directory_loaded = FALSE;
+
+    /* Start a new directory count. */
+    ammonite_directory_invalidate_count (directory);
+
+    add_all_files_to_work_queue (directory);
+    ammonite_directory_async_state_changed (directory);
+}
+
+static gboolean
+monitor_includes_file (const Monitor *monitor,
+                       AmmoniteFile  *file)
+{
+    if (monitor->file == file)
+    {
+        return TRUE;
+    }
+    /* monitor->file == NULL means monitor all files. */
+    if (monitor->file != NULL)
+    {
+        return FALSE;
+    }
+    if (ammonite_file_is_self_owned (file))
+    {
+        return FALSE;
+    }
+    return ammonite_file_should_show (file,
+                                      monitor->monitor_hidden_files);
+}
+
+static gboolean
+is_wanted_by_monitor (AmmoniteFile       *file,
+                      GList              *monitors,
+                      AmmoniteAttributes  attribute)
+{
+    GList *node;
+
+    for (node = monitors; node; node = node->next)
+    {
+        Monitor *monitor = node->data;
+
+        if (IS_ATTRIBUTE_SET (monitor->attributes, attribute) &&
+            monitor_includes_file (monitor, file))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static gboolean
+is_needy (AmmoniteFile       *file,
+          FileCheck           check_missing,
+          AmmoniteAttributes  attribute)
+{
+    AmmoniteDirectory *directory;
+    GList *node;
+    ReadyCallback *callback;
+
+    if (!(*check_missing)(file))
+    {
+        return FALSE;
+    }
+
+    directory = file->details->directory;
+    if (request_counter_has (directory->details->call_when_ready_counters, attribute))
+    {
+        node = g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, file);
+        for (; node != NULL; node = node->next)
+        {
+            callback = node->data;
+            if (IS_ATTRIBUTE_SET (callback->attributes, attribute))
+            {
+                return TRUE;
+            }
+        }
+
+        if (!ammonite_file_is_self_owned (file))
+        {
+            node = g_hash_table_lookup (directory->details->call_when_ready_hash.unsatisfied, NULL);
+            for (; node != NULL; node = node->next)
+            {
+                callback = node->data;
+                if (IS_ATTRIBUTE_SET (callback->attributes, attribute))
+                {
+                    return TRUE;
+                }
+            }
+        }
+    }
+
+    if (request_counter_has (directory->details->monitor_counters, attribute))
+    {
+        GList *monitors;
+
+        monitors = lookup_monitors (directory->details->monitor_table, file);
+        if (is_wanted_by_monitor (file, monitors, attribute))
+        {
+            return TRUE;
+        }
+
+        monitors = lookup_all_files_monitors (directory->details->monitor_table);
+        if (is_wanted_by_monitor (file, monitors, attribute))
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static void
+directory_count_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->count_in_progress != NULL)
+    {
+        file = directory->details->count_in_progress->count_file;
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file,
+                          should_get_directory_count_now,
+                          AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT))
+            {
+                return;
+            }
+        }
+
+        /* The count is not wanted, so stop it. */
+        directory_count_cancel (directory);
+    }
+}
+
+static guint
+count_non_skipped_files (GList *list)
+{
+    guint count;
+    GList *node;
+    GFileInfo *info;
+
+    count = 0;
+    for (node = list; node != NULL; node = node->next)
+    {
+        info = node->data;
+        if (!should_skip_file (info))
+        {
+            count += 1;
+        }
+    }
+    return count;
+}
+
+static void
+count_children_done (AmmoniteDirectory *directory,
+                     AmmoniteFile      *count_file,
+                     gboolean           succeeded,
+                     int                count)
+{
+    g_assert (AMMONITE_IS_FILE (count_file));
+
+    count_file->details->directory_count_is_up_to_date = TRUE;
+
+    /* Record either a failure or success. */
+    if (!succeeded)
+    {
+        count_file->details->directory_count_failed = TRUE;
+        count_file->details->got_directory_count = FALSE;
+        count_file->details->directory_count = 0;
+    }
+    else
+    {
+        count_file->details->directory_count_failed = FALSE;
+        count_file->details->got_directory_count = TRUE;
+        count_file->details->directory_count = count;
+    }
+    directory->details->count_in_progress = NULL;
+
+    /* Send file-changed even if count failed, so interested parties can
+     * distinguish between unknowable and not-yet-known cases.
+     */
+    ammonite_file_changed (count_file);
+
+    /* Start up the next one. */
+    async_job_end (directory, "directory count");
+    ammonite_directory_async_state_changed (directory);
+}
+
+static void
+directory_count_state_free (DirectoryCountState *state)
+{
+    if (state->enumerator)
+    {
+        if (!g_file_enumerator_is_closed (state->enumerator))
+        {
+            g_file_enumerator_close_async (state->enumerator,
+                                           0, NULL, NULL, NULL);
+        }
+        g_object_unref (state->enumerator);
+    }
+    g_object_unref (state->cancellable);
+    ammonite_directory_unref (state->directory);
+    g_free (state);
+}
+
+static void
+count_more_files_callback (GObject      *source_object,
+                           GAsyncResult *res,
+                           gpointer      user_data)
+{
+    DirectoryCountState *state;
+    AmmoniteDirectory *directory;
+    GError *error;
+    GList *files;
+
+    state = user_data;
+    directory = state->directory;
+
+    if (g_cancellable_is_cancelled (state->cancellable))
+    {
+        /* Operation was cancelled. Bail out */
+
+        async_job_end (directory, "directory count");
+        ammonite_directory_async_state_changed (directory);
+
+        directory_count_state_free (state);
+
+        return;
+    }
+
+    g_assert (directory->details->count_in_progress != NULL);
+    g_assert (directory->details->count_in_progress == state);
+
+    error = NULL;
+    files = g_file_enumerator_next_files_finish (state->enumerator,
+                                                 res, &error);
+
+    state->file_count += count_non_skipped_files (files);
+
+    if (files == NULL)
+    {
+        count_children_done (directory, state->count_file,
+                             TRUE, state->file_count);
+        directory_count_state_free (state);
+    }
+    else
+    {
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_DEFAULT,
+                                            state->cancellable,
+                                            count_more_files_callback,
+                                            state);
+    }
+
+    g_list_free_full (files, g_object_unref);
+
+    if (error)
+    {
+        g_error_free (error);
+    }
+}
+
+static void
+count_children_callback (GObject      *source_object,
+                         GAsyncResult *res,
+                         gpointer      user_data)
+{
+    DirectoryCountState *state;
+    GFileEnumerator *enumerator;
+    AmmoniteDirectory *directory;
+    GError *error;
+
+    state = user_data;
+
+    if (g_cancellable_is_cancelled (state->cancellable))
+    {
+        /* Operation was cancelled. Bail out */
+        directory = state->directory;
+
+        async_job_end (directory, "directory count");
+        ammonite_directory_async_state_changed (directory);
+
+        directory_count_state_free (state);
+
+        return;
+    }
+
+    error = NULL;
+    enumerator = g_file_enumerate_children_finish (G_FILE (source_object),
+                                                   res, &error);
+
+    if (enumerator == NULL)
+    {
+        count_children_done (state->directory,
+                             state->count_file,
+                             FALSE, 0);
+        g_error_free (error);
+        directory_count_state_free (state);
+        return;
+    }
+    else
+    {
+        state->enumerator = enumerator;
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_DEFAULT,
+                                            state->cancellable,
+                                            count_more_files_callback,
+                                            state);
+    }
+}
+
+static void
+directory_count_start (AmmoniteDirectory *directory,
+                       AmmoniteFile      *file,
+                       gboolean          *doing_io)
+{
+    DirectoryCountState *state;
+    GFile *location;
+
+    if (directory->details->count_in_progress != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   should_get_directory_count_now,
+                   AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "directory count"))
+    {
+        return;
+    }
+
+    /* Start counting. */
+    state = g_new0 (DirectoryCountState, 1);
+    state->count_file = file;
+    state->directory = ammonite_directory_ref (directory);
+    state->cancellable = g_cancellable_new ();
+
+    directory->details->count_in_progress = state;
+
+    location = ammonite_file_get_location (file);
+
+    {
+        g_autofree char *uri = NULL;
+        uri = g_file_get_uri (location);
+        g_debug ("load_directory called to get shallow file count for %s", uri);
+    }
+
+    g_file_enumerate_children_async (location,
+                                     G_FILE_ATTRIBUTE_STANDARD_NAME ","
+                                     G_FILE_ATTRIBUTE_STANDARD_IS_HIDDEN ","
+                                     G_FILE_ATTRIBUTE_STANDARD_IS_BACKUP,
+                                     G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,     /* flags */
+                                     G_PRIORITY_DEFAULT,     /* prio */
+                                     state->cancellable,
+                                     count_children_callback,
+                                     state);
+    g_object_unref (location);
+}
+
+static void
+deep_count_one (DeepCountState *state,
+                GFileInfo      *info)
+{
+    guint64 inode = g_file_info_get_attribute_uint64 (info, G_FILE_ATTRIBUTE_UNIX_INODE);
+    gboolean is_seen_inode = FALSE;
+    AmmoniteFile *file;
+    GFile *subdir;
+    const char *fs_id;
+
+    if (inode != 0)
+    {
+        is_seen_inode = !g_hash_table_add (state->seen_deep_count_inodes, &inode);
+    }
+
+    file = state->directory->details->deep_count_file;
+
+    if (g_file_info_get_file_type (info) == G_FILE_TYPE_DIRECTORY)
+    {
+        /* Count the directory. */
+        file->details->deep_directory_count += 1;
+
+        /* Record the fact that we have to descend into this directory. */
+        fs_id = g_file_info_get_attribute_string (info, G_FILE_ATTRIBUTE_ID_FILESYSTEM);
+        if (g_strcmp0 (fs_id, state->fs_id) == 0)
+        {
+            /* only if it is on the same filesystem */
+            subdir = g_file_get_child (state->deep_count_location, g_file_info_get_name (info));
+            state->deep_count_subdirectories = g_list_prepend
+                                                   (state->deep_count_subdirectories, subdir);
+        }
+    }
+    else
+    {
+        /* Even non-regular files count as files. */
+        file->details->deep_file_count += 1;
+    }
+
+    /* Count the size. */
+    if (!is_seen_inode && g_file_info_has_attribute (info, G_FILE_ATTRIBUTE_STANDARD_SIZE))
+    {
+        file->details->deep_size += g_file_info_get_size (info);
+    }
+}
+
+static void
+deep_count_state_free (DeepCountState *state)
+{
+    if (state->enumerator)
+    {
+        if (!g_file_enumerator_is_closed (state->enumerator))
+        {
+            g_file_enumerator_close_async (state->enumerator,
+                                           0, NULL, NULL, NULL);
+        }
+        g_object_unref (state->enumerator);
+    }
+    g_object_unref (state->cancellable);
+    if (state->deep_count_location)
+    {
+        g_object_unref (state->deep_count_location);
+    }
+    g_list_free_full (state->deep_count_subdirectories, g_object_unref);
+    g_hash_table_unref (state->seen_deep_count_inodes);
+    g_free (state->fs_id);
+    g_free (state);
+}
+
+static void
+deep_count_next_dir (DeepCountState *state)
+{
+    GFile *location;
+    AmmoniteFile *file;
+    AmmoniteDirectory *directory;
+    gboolean done;
+
+    directory = state->directory;
+
+    g_object_unref (state->deep_count_location);
+    state->deep_count_location = NULL;
+
+    done = FALSE;
+    file = directory->details->deep_count_file;
+
+    if (state->deep_count_subdirectories != NULL)
+    {
+        /* Work on a new directory. */
+        location = state->deep_count_subdirectories->data;
+        state->deep_count_subdirectories = g_list_remove
+                                               (state->deep_count_subdirectories, location);
+        deep_count_load (state, location);
+        g_object_unref (location);
+    }
+    else
+    {
+        file->details->deep_counts_status = AMMONITE_REQUEST_DONE;
+        directory->details->deep_count_file = NULL;
+        directory->details->deep_count_in_progress = NULL;
+        deep_count_state_free (state);
+        done = TRUE;
+    }
+
+    ammonite_file_updated_deep_count_in_progress (file);
+
+    if (done)
+    {
+        ammonite_file_changed (file);
+        async_job_end (directory, "deep count");
+        ammonite_directory_async_state_changed (directory);
+    }
+}
+
+static void
+deep_count_more_files_callback (GObject      *source_object,
+                                GAsyncResult *res,
+                                gpointer      user_data)
+{
+    DeepCountState *state;
+    AmmoniteDirectory *directory;
+    GList *files, *l;
+    GFileInfo *info;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        deep_count_state_free (state);
+        return;
+    }
+
+    directory = ammonite_directory_ref (state->directory);
+
+    g_assert (directory->details->deep_count_in_progress != NULL);
+    g_assert (directory->details->deep_count_in_progress == state);
+
+    files = g_file_enumerator_next_files_finish (state->enumerator,
+                                                 res, NULL);
+
+    for (l = files; l != NULL; l = l->next)
+    {
+        info = l->data;
+        deep_count_one (state, info);
+        g_object_unref (info);
+    }
+
+    if (files == NULL)
+    {
+        g_file_enumerator_close_async (state->enumerator, 0, NULL, NULL, NULL);
+        g_object_unref (state->enumerator);
+        state->enumerator = NULL;
+
+        deep_count_next_dir (state);
+    }
+    else
+    {
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_LOW,
+                                            state->cancellable,
+                                            deep_count_more_files_callback,
+                                            state);
+    }
+
+    g_list_free (files);
+
+    ammonite_directory_unref (directory);
+}
+
+static void
+deep_count_callback (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+{
+    DeepCountState *state;
+    GFileEnumerator *enumerator;
+    AmmoniteFile *file;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        deep_count_state_free (state);
+        return;
+    }
+
+    file = state->directory->details->deep_count_file;
+
+    enumerator = g_file_enumerate_children_finish (G_FILE (source_object), res, NULL);
+
+    if (enumerator == NULL)
+    {
+        file->details->deep_unreadable_count += 1;
+
+        deep_count_next_dir (state);
+    }
+    else
+    {
+        state->enumerator = enumerator;
+        g_file_enumerator_next_files_async (state->enumerator,
+                                            DIRECTORY_LOAD_ITEMS_PER_CALLBACK,
+                                            G_PRIORITY_LOW,
+                                            state->cancellable,
+                                            deep_count_more_files_callback,
+                                            state);
+    }
+}
+
+
+static void
+deep_count_load (DeepCountState *state,
+                 GFile          *location)
+{
+    state->deep_count_location = g_object_ref (location);
+
+    g_debug ("load_directory called to get deep file count for %p", location);
+    g_file_enumerate_children_async (state->deep_count_location,
+                                     G_FILE_ATTRIBUTE_STANDARD_NAME ","
+                                     G_FILE_ATTRIBUTE_STANDARD_TYPE ","
+                                     G_FILE_ATTRIBUTE_STANDARD_SIZE ","
+                                     G_FILE_ATTRIBUTE_STANDARD_IS_HIDDEN ","
+                                     G_FILE_ATTRIBUTE_STANDARD_IS_BACKUP ","
+                                     G_FILE_ATTRIBUTE_ID_FILESYSTEM ","
+                                     G_FILE_ATTRIBUTE_UNIX_INODE,
+                                     G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,     /* flags */
+                                     G_PRIORITY_LOW,     /* prio */
+                                     state->cancellable,
+                                     deep_count_callback,
+                                     state);
+}
+
+static void
+deep_count_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->deep_count_in_progress != NULL)
+    {
+        file = directory->details->deep_count_file;
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file,
+                          lacks_deep_count,
+                          AMMONITE_ATTRIBUTE_DEEP_COUNT))
+            {
+                return;
+            }
+        }
+
+        /* The count is not wanted, so stop it. */
+        deep_count_cancel (directory);
+    }
+}
+
+static void
+deep_count_got_info (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+{
+    GFileInfo *info;
+    const char *id;
+    GFile *file = (GFile *) source_object;
+    DeepCountState *state = (DeepCountState *) user_data;
+
+    info = g_file_query_info_finish (file, res, NULL);
+    if (info != NULL)
+    {
+        id = g_file_info_get_attribute_string (info, G_FILE_ATTRIBUTE_ID_FILESYSTEM);
+        state->fs_id = g_strdup (id);
+        g_object_unref (info);
+    }
+    deep_count_load (state, file);
+}
+
+static void
+deep_count_start (AmmoniteDirectory *directory,
+                  AmmoniteFile      *file,
+                  gboolean          *doing_io)
+{
+    GFile *location;
+    DeepCountState *state;
+
+    if (directory->details->deep_count_in_progress != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   lacks_deep_count,
+                   AMMONITE_ATTRIBUTE_DEEP_COUNT))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!ammonite_file_is_directory (file))
+    {
+        file->details->deep_counts_status = AMMONITE_REQUEST_DONE;
+
+        ammonite_directory_async_state_changed (directory);
+        return;
+    }
+
+    if (!async_job_start (directory, "deep count"))
+    {
+        return;
+    }
+
+    /* Start counting. */
+    file->details->deep_counts_status = AMMONITE_REQUEST_IN_PROGRESS;
+    file->details->deep_directory_count = 0;
+    file->details->deep_file_count = 0;
+    file->details->deep_unreadable_count = 0;
+    file->details->deep_size = 0;
+    directory->details->deep_count_file = file;
+
+    state = g_new0 (DeepCountState, 1);
+    state->directory = directory;
+    state->cancellable = g_cancellable_new ();
+    state->seen_deep_count_inodes = g_hash_table_new (g_int64_hash, g_int64_equal);
+    state->fs_id = NULL;
+
+    directory->details->deep_count_in_progress = state;
+
+    location = ammonite_file_get_location (file);
+    g_file_query_info_async (location,
+                             G_FILE_ATTRIBUTE_ID_FILESYSTEM,
+                             G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                             G_PRIORITY_DEFAULT,
+                             NULL,
+                             deep_count_got_info,
+                             state);
+    g_object_unref (location);
+}
+
+static void
+get_info_state_free (GetInfoState *state)
+{
+    g_object_unref (state->cancellable);
+    g_free (state);
+}
+
+static void
+query_info_callback (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+{
+    AmmoniteDirectory *directory;
+    AmmoniteFile *get_info_file;
+    GFileInfo *info;
+    GetInfoState *state;
+    GError *error;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        get_info_state_free (state);
+        return;
+    }
+
+    directory = ammonite_directory_ref (state->directory);
+
+    get_info_file = directory->details->get_info_file;
+    g_assert (AMMONITE_IS_FILE (get_info_file));
+
+    directory->details->get_info_file = NULL;
+    directory->details->get_info_in_progress = NULL;
+
+    /* ref here because we might be removing the last ref when we
+     * mark the file gone below, but we need to keep a ref at
+     * least long enough to send the change notification.
+     */
+    ammonite_file_ref (get_info_file);
+
+    error = NULL;
+    info = g_file_query_info_finish (G_FILE (source_object), res, &error);
+
+    if (info == NULL)
+    {
+        if (error->domain == G_IO_ERROR && error->code == G_IO_ERROR_NOT_FOUND)
+        {
+            /* mark file as gone */
+            ammonite_file_mark_gone (get_info_file);
+        }
+        get_info_file->details->file_info_is_up_to_date = TRUE;
+        ammonite_file_clear_info (get_info_file);
+        get_info_file->details->get_info_failed = TRUE;
+        get_info_file->details->get_info_error = error;
+    }
+    else
+    {
+        ammonite_file_update_info (get_info_file, info);
+        g_object_unref (info);
+    }
+
+    ammonite_file_changed (get_info_file);
+    ammonite_file_unref (get_info_file);
+
+    async_job_end (directory, "file info");
+    ammonite_directory_async_state_changed (directory);
+
+    ammonite_directory_unref (directory);
+
+    get_info_state_free (state);
+}
+
+static void
+file_info_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->get_info_in_progress != NULL)
+    {
+        file = directory->details->get_info_file;
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file, lacks_info, AMMONITE_ATTRIBUTE_INFO))
+            {
+                return;
+            }
+        }
+
+        /* The info is not wanted, so stop it. */
+        file_info_cancel (directory);
+    }
+}
+
+static void
+file_info_start (AmmoniteDirectory *directory,
+                 AmmoniteFile      *file,
+                 gboolean          *doing_io)
+{
+    GFile *location;
+    GetInfoState *state;
+
+    if (directory->details->get_info_in_progress != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file, lacks_info, AMMONITE_ATTRIBUTE_INFO))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "file info"))
+    {
+        return;
+    }
+
+    directory->details->get_info_file = file;
+    file->details->get_info_failed = FALSE;
+    if (file->details->get_info_error)
+    {
+        g_error_free (file->details->get_info_error);
+        file->details->get_info_error = NULL;
+    }
+
+    state = g_new (GetInfoState, 1);
+    state->directory = directory;
+    state->cancellable = g_cancellable_new ();
+
+    directory->details->get_info_in_progress = state;
+
+    location = ammonite_file_get_location (file);
+    g_file_query_info_async (location,
+                             AMMONITE_FILE_DEFAULT_ATTRIBUTES,
+                             G_FILE_QUERY_INFO_NONE,
+                             G_PRIORITY_DEFAULT,
+                             state->cancellable, query_info_callback, state);
+    g_object_unref (location);
+}
+
+static void
+thumbnail_info_state_free (ThumbnailInfoState *state)
+{
+    g_clear_object (&state->cancellable);
+    g_free (state);
+}
+
+static void
+thumbnail_info_stop (AmmoniteDirectory *directory)
+{
+    if (directory->details->thumbnail_info_state == NULL)
+    {
+        return;
+    }
+
+    AmmoniteFile *file = directory->details->thumbnail_info_state->file;
+
+    if (file != NULL)
+    {
+        g_assert (AMMONITE_IS_FILE (file));
+        g_assert (file->details->directory == directory);
+
+        if (is_needy (file,
+                      lacks_thumbnail_info,
+                      AMMONITE_ATTRIBUTE_THUMBNAIL_INFO))
+        {
+            return;
+        }
+    }
+
+    /* The info is not wanted, so stop it. */
+    thumbnail_info_cancel (directory);
+}
+
+static void
+thumbnail_info_done (AmmoniteDirectory *directory,
+                     AmmoniteFile      *file,
+                     GFileInfo         *info)
+{
+    file->details->thumbnail_info_is_up_to_date = TRUE;
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+static void
+thumbnail_info_query_callback (GObject      *source_object,
+                               GAsyncResult *res,
+                               gpointer      user_data)
+{
+    ThumbnailInfoState *state = user_data;
+    gboolean changed = FALSE;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        thumbnail_info_state_free (state);
+        return;
+    }
+
+    g_autoptr (GError) error = NULL;
+    g_autoptr (GFileInfo) info = g_file_query_info_finish (G_FILE (source_object), res, &error);
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_ref (state->directory);
+    g_autoptr (AmmoniteFile) file = ammonite_file_ref (state->file);
+
+    if (info != NULL && error == NULL)
+    {
+        changed = ammonite_file_update_thumbnail_info (state->file, info);
+    }
+
+    state->directory->details->thumbnail_info_state = NULL;
+    async_job_end (state->directory, "thumbnail info");
+
+    thumbnail_info_done (directory, file, info);
+
+    if (changed)
+    {
+        ammonite_file_changed (file);
+    }
+
+    thumbnail_info_state_free (state);
+}
+
+static void
+thumbnail_info_start (AmmoniteDirectory *directory,
+                      AmmoniteFile      *file,
+                      gboolean          *doing_io)
+{
+    if (directory->details->thumbnail_info_state != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   lacks_thumbnail_info,
+                   AMMONITE_ATTRIBUTE_THUMBNAIL_INFO))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "thumbnail info"))
+    {
+        return;
+    }
+
+    ThumbnailInfoState *state = g_new0 (ThumbnailInfoState, 1);
+    g_autoptr (GFile) location = ammonite_file_get_location (file);
+
+    state->directory = directory;
+    state->file = file;
+    state->cancellable = g_cancellable_new ();
+
+    directory->details->thumbnail_info_state = state;
+
+    g_file_query_info_async (location,
+                             "thumbnail::*",
+                             G_FILE_QUERY_INFO_NONE,
+                             G_PRIORITY_DEFAULT, state->cancellable,
+                             thumbnail_info_query_callback,
+                             state);
+}
+
+static void
+thumbnail_buf_done (AmmoniteDirectory *directory,
+                    AmmoniteFile      *file,
+                    GdkTexture        *texture,
+                    time_t             mtime)
+{
+    if (!ammonite_file_set_thumbnail (file, texture, mtime))
+    {
+        g_clear_pointer (&file->details->thumbnail_path, g_free);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+static void
+thumbnail_buf_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->thumbnail_buf_state != NULL)
+    {
+        file = directory->details->thumbnail_buf_state->file;
+
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file,
+                          lacks_thumbnail_buf,
+                          AMMONITE_ATTRIBUTE_THUMBNAIL_BUFFER))
+            {
+                return;
+            }
+        }
+
+        /* The link info is not wanted, so stop it. */
+        thumbnail_buf_cancel (directory);
+    }
+}
+
+static void
+thumbnail_got_texture (AmmoniteDirectory *directory,
+                       AmmoniteFile      *file,
+                       GdkTexture        *texture,
+                       time_t             mtime)
+{
+    ammonite_directory_ref (directory);
+
+    ammonite_file_ref (file);
+    thumbnail_buf_done (directory, file, texture, mtime);
+    ammonite_file_changed (file);
+    ammonite_file_unref (file);
+
+    ammonite_directory_unref (directory);
+}
+
+static void
+thumbnail_buf_state_free (ThumbnailBufState *state)
+{
+    g_object_unref (state->cancellable);
+    g_free (state);
+}
+
+static void
+thumbnail_texture_ready_callback (GObject      *source_object,
+                                  GAsyncResult *res,
+                                  gpointer      user_data)
+{
+    ThumbnailBufState *state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        thumbnail_buf_state_free (state);
+        return;
+    }
+
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_ref (state->directory);
+    time_t mtime = 0;
+    g_autoptr (GdkTexture) texture = thumbnail_load_from_stream_finish (res, &mtime, NULL);
+
+    state->directory->details->thumbnail_buf_state = NULL;
+    async_job_end (state->directory, "thumbnail buffer");
+
+    thumbnail_got_texture (state->directory, state->file, texture, mtime);
+
+    thumbnail_buf_state_free (state);
+}
+
+static void
+thumbnail_file_read_callback (GObject      *source_object,
+                              GAsyncResult *res,
+                              gpointer      user_data)
+{
+    ThumbnailBufState *state;
+    g_autoptr (GFileInputStream) stream = NULL;
+
+    state = user_data;
+
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        thumbnail_buf_state_free (state);
+        return;
+    }
+
+    stream = g_file_read_finish (G_FILE (source_object), res, NULL);
+
+    if (stream)
+    {
+        thumbnail_load_from_stream_async (G_INPUT_STREAM (stream),
+                                          state->cancellable,
+                                          thumbnail_texture_ready_callback,
+                                          state);
+    }
+    else
+    {
+        g_autoptr (AmmoniteDirectory) directory = ammonite_directory_ref (state->directory);
+
+        state->directory->details->thumbnail_buf_state = NULL;
+        async_job_end (state->directory, "thumbnail buffer");
+
+        thumbnail_got_texture (state->directory, state->file, NULL, 0);
+
+        thumbnail_buf_state_free (state);
+    }
+}
+
+static void
+thumbnail_buf_start (AmmoniteDirectory *directory,
+                     AmmoniteFile      *file,
+                     gboolean          *doing_io)
+{
+    GFile *location;
+    ThumbnailBufState *state;
+
+    if (directory->details->thumbnail_buf_state != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   lacks_thumbnail_buf,
+                   AMMONITE_ATTRIBUTE_THUMBNAIL_BUFFER))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "thumbnail buffer"))
+    {
+        return;
+    }
+
+    state = g_new0 (ThumbnailBufState, 1);
+    state->directory = directory;
+    state->file = file;
+    state->cancellable = g_cancellable_new ();
+
+    location = g_file_new_for_path (file->details->thumbnail_path);
+
+    directory->details->thumbnail_buf_state = state;
+
+    g_file_read_async (location,
+                       G_PRIORITY_DEFAULT,
+                       state->cancellable,
+                       thumbnail_file_read_callback,
+                       state);
+    g_object_unref (location);
+}
+
+static void
+mount_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->mount_state != NULL)
+    {
+        file = directory->details->mount_state->file;
+
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file,
+                          lacks_mount,
+                          AMMONITE_ATTRIBUTE_MOUNT))
+            {
+                return;
+            }
+        }
+
+        /* The link info is not wanted, so stop it. */
+        mount_cancel (directory);
+    }
+}
+
+static void
+mount_state_free (MountState *state)
+{
+    g_object_unref (state->cancellable);
+    g_free (state);
+}
+
+static void
+got_mount (MountState *state,
+           GMount     *mount)
+{
+    AmmoniteDirectory *directory;
+    AmmoniteFile *file;
+
+    directory = ammonite_directory_ref (state->directory);
+
+    state->directory->details->mount_state = NULL;
+    async_job_end (state->directory, "mount");
+
+    file = ammonite_file_ref (state->file);
+
+    file->details->mount_is_up_to_date = TRUE;
+    ammonite_file_set_mount (file, mount);
+
+    ammonite_directory_async_state_changed (directory);
+    ammonite_file_changed (file);
+
+    ammonite_file_unref (file);
+
+    ammonite_directory_unref (directory);
+
+    mount_state_free (state);
+}
+
+static void
+find_enclosing_mount_callback (GObject      *source_object,
+                               GAsyncResult *res,
+                               gpointer      user_data)
+{
+    GMount *mount;
+    MountState *state;
+    GFile *location, *root;
+
+    state = user_data;
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        mount_state_free (state);
+        return;
+    }
+
+    mount = g_file_find_enclosing_mount_finish (G_FILE (source_object),
+                                                res, NULL);
+
+    if (mount)
+    {
+        root = g_mount_get_root (mount);
+        location = ammonite_file_get_location (state->file);
+        if (!g_file_equal (location, root))
+        {
+            g_object_unref (mount);
+            mount = NULL;
+        }
+        g_object_unref (root);
+        g_object_unref (location);
+    }
+
+    got_mount (state, mount);
+
+    if (mount)
+    {
+        g_object_unref (mount);
+    }
+}
+
+static void
+mount_start (AmmoniteDirectory *directory,
+             AmmoniteFile      *file,
+             gboolean          *doing_io)
+{
+    GFile *location;
+    MountState *state;
+
+    if (directory->details->mount_state != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   lacks_mount,
+                   AMMONITE_ATTRIBUTE_MOUNT))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "mount"))
+    {
+        return;
+    }
+
+    state = g_new0 (MountState, 1);
+    state->directory = directory;
+    state->file = file;
+    state->cancellable = g_cancellable_new ();
+
+    location = ammonite_file_get_location (file);
+
+    directory->details->mount_state = state;
+
+    if (file->details->type == G_FILE_TYPE_MOUNTABLE)
+    {
+        GFile *target;
+        GMount *mount;
+
+        mount = NULL;
+        target = ammonite_file_get_activation_location (file);
+        if (target != NULL)
+        {
+            mount = ammonite_get_mounted_mount_for_root (target);
+            g_object_unref (target);
+        }
+
+        got_mount (state, mount);
+
+        if (mount)
+        {
+            g_object_unref (mount);
+        }
+    }
+    else
+    {
+        g_file_find_enclosing_mount_async (location,
+                                           G_PRIORITY_DEFAULT,
+                                           state->cancellable,
+                                           find_enclosing_mount_callback,
+                                           state);
+    }
+    g_object_unref (location);
+}
+
+static void
+filesystem_info_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->filesystem_info_state != NULL)
+    {
+        g_cancellable_cancel (directory->details->filesystem_info_state->cancellable);
+        directory->details->filesystem_info_state->directory = NULL;
+        directory->details->filesystem_info_state = NULL;
+        async_job_end (directory, "filesystem info");
+    }
+}
+
+static void
+filesystem_info_stop (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+
+    if (directory->details->filesystem_info_state != NULL)
+    {
+        file = directory->details->filesystem_info_state->file;
+
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file,
+                          lacks_filesystem_info,
+                          AMMONITE_ATTRIBUTE_FILESYSTEM_INFO))
+            {
+                return;
+            }
+        }
+
+        /* The filesystem info is not wanted, so stop it. */
+        filesystem_info_cancel (directory);
+    }
+}
+
+static void
+filesystem_info_state_free (FilesystemInfoState *state)
+{
+    g_object_unref (state->cancellable);
+    g_free (state);
+}
+
+static void
+got_filesystem_info (FilesystemInfoState *state,
+                     GFileInfo           *info)
+{
+    AmmoniteDirectory *directory;
+    AmmoniteFile *file;
+
+    /* careful here, info may be NULL */
+
+    directory = ammonite_directory_ref (state->directory);
+
+    state->directory->details->filesystem_info_state = NULL;
+    async_job_end (state->directory, "filesystem info");
+
+    file = ammonite_file_ref (state->file);
+
+    file->details->filesystem_info_is_up_to_date = TRUE;
+    if (info != NULL)
+    {
+        file->details->filesystem_use_preview =
+            g_file_info_get_attribute_uint32 (info, G_FILE_ATTRIBUTE_FILESYSTEM_USE_PREVIEW);
+        file->details->filesystem_readonly =
+            g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_FILESYSTEM_READONLY);
+        file->details->filesystem_remote = g_file_info_get_attribute_boolean (info, G_FILE_ATTRIBUTE_FILESYSTEM_REMOTE);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+    ammonite_file_changed (file);
+
+    ammonite_file_unref (file);
+
+    ammonite_directory_unref (directory);
+
+    filesystem_info_state_free (state);
+}
+
+static void
+query_filesystem_info_callback (GObject      *source_object,
+                                GAsyncResult *res,
+                                gpointer      user_data)
+{
+    GFileInfo *info;
+    FilesystemInfoState *state;
+
+    state = user_data;
+    if (state->directory == NULL)
+    {
+        /* Operation was cancelled. Bail out */
+        filesystem_info_state_free (state);
+        return;
+    }
+
+    info = g_file_query_filesystem_info_finish (G_FILE (source_object), res, NULL);
+
+    got_filesystem_info (state, info);
+
+    if (info != NULL)
+    {
+        g_object_unref (info);
+    }
+}
+
+static void
+filesystem_info_start (AmmoniteDirectory *directory,
+                       AmmoniteFile      *file,
+                       gboolean          *doing_io)
+{
+    GFile *location;
+    FilesystemInfoState *state;
+
+    if (directory->details->filesystem_info_state != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file,
+                   lacks_filesystem_info,
+                   AMMONITE_ATTRIBUTE_FILESYSTEM_INFO))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "filesystem info"))
+    {
+        return;
+    }
+
+    state = g_new0 (FilesystemInfoState, 1);
+    state->directory = directory;
+    state->file = file;
+    state->cancellable = g_cancellable_new ();
+
+    location = ammonite_file_get_location (file);
+
+    directory->details->filesystem_info_state = state;
+
+    g_file_query_filesystem_info_async (location,
+                                        G_FILE_ATTRIBUTE_FILESYSTEM_READONLY ","
+                                        G_FILE_ATTRIBUTE_FILESYSTEM_USE_PREVIEW ","
+                                        G_FILE_ATTRIBUTE_FILESYSTEM_REMOTE,
+                                        G_PRIORITY_DEFAULT,
+                                        state->cancellable,
+                                        query_filesystem_info_callback,
+                                        state);
+    g_object_unref (location);
+}
+
+static void
+extension_info_cancel (AmmoniteDirectory *directory)
+{
+    if (directory->details->extension_info_in_progress != NULL)
+    {
+        if (directory->details->extension_info_idle)
+        {
+            g_source_remove (directory->details->extension_info_idle);
+        }
+        else
+        {
+            ammonite_info_provider_cancel_update
+                (directory->details->extension_info_provider,
+                directory->details->extension_info_in_progress);
+        }
+
+        directory->details->extension_info_in_progress = NULL;
+        directory->details->extension_info_file = NULL;
+        directory->details->extension_info_provider = NULL;
+        directory->details->extension_info_idle = 0;
+
+        async_job_end (directory, "extension info");
+    }
+}
+
+static void
+extension_info_stop (AmmoniteDirectory *directory)
+{
+    if (directory->details->extension_info_in_progress != NULL)
+    {
+        AmmoniteFile *file;
+
+        file = directory->details->extension_info_file;
+        if (file != NULL)
+        {
+            g_assert (AMMONITE_IS_FILE (file));
+            g_assert (file->details->directory == directory);
+            if (is_needy (file, lacks_extension_info, AMMONITE_ATTRIBUTE_EXTENSION_INFO))
+            {
+                return;
+            }
+        }
+
+        /* The info is not wanted, so stop it. */
+        extension_info_cancel (directory);
+    }
+}
+
+static void
+finish_info_provider (AmmoniteDirectory    *directory,
+                      AmmoniteFile         *file,
+                      AmmoniteInfoProvider *provider)
+{
+    g_return_if_fail (directory != NULL);
+    g_return_if_fail (file != NULL);
+
+    file->details->pending_info_providers =
+        g_list_remove (file->details->pending_info_providers,
+                       provider);
+    g_object_unref (provider);
+
+    ammonite_directory_async_state_changed (directory);
+
+    if (file->details->pending_info_providers == NULL)
+    {
+        ammonite_file_changed (file);
+    }
+}
+
+
+static gboolean
+info_provider_idle_callback (gpointer user_data)
+{
+    InfoProviderResponse *response;
+    AmmoniteDirectory *directory;
+
+    response = user_data;
+    directory = response->directory;
+
+    g_return_val_if_fail (directory != NULL, FALSE);
+
+    if (response->handle != directory->details->extension_info_in_progress
+        || response->provider != directory->details->extension_info_provider)
+    {
+        g_warning ("Unexpected plugin response.  This probably indicates a bug in a Ammonite extension: handle=%p", response->handle);
+    }
+    else
+    {
+        AmmoniteFile *file;
+        async_job_end (directory, "extension info");
+
+        file = g_steal_pointer (&directory->details->extension_info_file);
+        directory->details->extension_info_provider = NULL;
+        directory->details->extension_info_in_progress = NULL;
+        directory->details->extension_info_idle = 0;
+
+        finish_info_provider (directory, file, response->provider);
+    }
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+info_provider_callback (AmmoniteInfoProvider    *provider,
+                        AmmoniteOperationHandle *handle,
+                        AmmoniteOperationResult  result,
+                        gpointer                 user_data)
+{
+    InfoProviderResponse *response;
+
+    response = g_new0 (InfoProviderResponse, 1);
+    response->provider = provider;
+    response->handle = handle;
+    response->result = result;
+    response->directory = AMMONITE_DIRECTORY (user_data);
+
+    response->directory->details->extension_info_idle =
+        g_idle_add_full (G_PRIORITY_DEFAULT_IDLE,
+                         info_provider_idle_callback, response,
+                         g_free);
+}
+
+static void
+extension_info_start (AmmoniteDirectory *directory,
+                      AmmoniteFile      *file,
+                      gboolean          *doing_io)
+{
+    AmmoniteInfoProvider *provider;
+    AmmoniteOperationResult result;
+    AmmoniteOperationHandle *handle;
+    GClosure *update_complete;
+
+    if (directory->details->extension_info_in_progress != NULL)
+    {
+        *doing_io = TRUE;
+        return;
+    }
+
+    if (!is_needy (file, lacks_extension_info, AMMONITE_ATTRIBUTE_EXTENSION_INFO))
+    {
+        return;
+    }
+    *doing_io = TRUE;
+
+    if (!async_job_start (directory, "extension info"))
+    {
+        return;
+    }
+
+    provider = file->details->pending_info_providers->data;
+
+    update_complete = g_cclosure_new (G_CALLBACK (info_provider_callback),
+                                      directory,
+                                      NULL);
+    g_closure_set_marshal (update_complete,
+                           g_cclosure_marshal_generic);
+
+    result = ammonite_info_provider_update_file_info
+                 (provider,
+                 AMMONITE_FILE_INFO (file),
+                 update_complete,
+                 &handle);
+
+    g_closure_unref (update_complete);
+
+    if (result == AMMONITE_OPERATION_COMPLETE ||
+        result == AMMONITE_OPERATION_FAILED)
+    {
+        finish_info_provider (directory, file, provider);
+        async_job_end (directory, "extension info");
+    }
+    else
+    {
+        directory->details->extension_info_in_progress = handle;
+        directory->details->extension_info_provider = provider;
+        directory->details->extension_info_file = file;
+    }
+}
+
+static void
+start_or_stop_io (AmmoniteDirectory *directory)
+{
+    AmmoniteFile *file;
+    gboolean doing_io;
+
+    /* Start or stop reading files. */
+    file_list_start_or_stop (directory);
+
+    /* Stop any no longer wanted attribute fetches. */
+    file_info_stop (directory);
+    directory_count_stop (directory);
+    deep_count_stop (directory);
+    extension_info_stop (directory);
+    mount_stop (directory);
+    thumbnail_info_stop (directory);
+    thumbnail_buf_stop (directory);
+    filesystem_info_stop (directory);
+
+    doing_io = FALSE;
+    /* Take files that are all done off the queue. */
+    while (!ammonite_hash_queue_is_empty (directory->details->high_priority_queue))
+    {
+        file = ammonite_hash_queue_peek_head (directory->details->high_priority_queue);
+
+        /* Start getting attributes if possible */
+        file_info_start (directory, file, &doing_io);
+        thumbnail_info_start (directory, file, &doing_io);
+
+        if (doing_io)
+        {
+            return;
+        }
+
+        move_file_to_low_priority_queue (directory, file);
+    }
+
+    /* High priority queue must be empty */
+    while (!ammonite_hash_queue_is_empty (directory->details->low_priority_queue))
+    {
+        file = ammonite_hash_queue_peek_head (directory->details->low_priority_queue);
+
+        /* Start getting attributes if possible */
+        mount_start (directory, file, &doing_io);
+        directory_count_start (directory, file, &doing_io);
+        deep_count_start (directory, file, &doing_io);
+        filesystem_info_start (directory, file, &doing_io);
+        thumbnail_buf_start (directory, file, &doing_io);
+
+        if (doing_io)
+        {
+            return;
+        }
+
+        move_file_to_extension_queue (directory, file);
+    }
+
+    /* Low priority queue must be empty */
+    while (!ammonite_hash_queue_is_empty (directory->details->extension_queue))
+    {
+        file = ammonite_hash_queue_peek_head (directory->details->extension_queue);
+
+        /* Start getting attributes if possible */
+        extension_info_start (directory, file, &doing_io);
+        if (doing_io)
+        {
+            return;
+        }
+
+        ammonite_directory_remove_file_from_work_queue (directory, file);
+    }
+}
+
+/* Call this when the monitor or call when ready list changes,
+ * or when some I/O is completed.
+ */
+void
+ammonite_directory_async_state_changed (AmmoniteDirectory *directory)
+{
+    /* Check if any callbacks are satisfied and call them if they
+     * are. Do this last so that any changes done in start or stop
+     * I/O functions immediately (not in callbacks) are taken into
+     * consideration. If any callbacks are called, consider the
+     * I/O state again so that we can release or cancel I/O that
+     * is not longer needed once the callbacks are satisfied.
+     */
+
+    if (directory->details->in_async_service_loop)
+    {
+        directory->details->state_changed = TRUE;
+        return;
+    }
+    directory->details->in_async_service_loop = TRUE;
+    ammonite_directory_ref (directory);
+    do
+    {
+        directory->details->state_changed = FALSE;
+        start_or_stop_io (directory);
+        if (call_ready_callbacks (directory))
+        {
+            directory->details->state_changed = TRUE;
+        }
+    }
+    while (directory->details->state_changed);
+    directory->details->in_async_service_loop = FALSE;
+    ammonite_directory_unref (directory);
+
+    /* Check if any directories should wake up. */
+    async_job_wake_up ();
+}
+
+void
+ammonite_directory_cancel (AmmoniteDirectory *directory)
+{
+    /* Arbitrary order (kept alphabetical). */
+    deep_count_cancel (directory);
+    directory_count_cancel (directory);
+    file_info_cancel (directory);
+    file_list_cancel (directory);
+    new_files_cancel (directory);
+    extension_info_cancel (directory);
+    thumbnail_info_cancel (directory);
+    thumbnail_buf_cancel (directory);
+    mount_cancel (directory);
+    filesystem_info_cancel (directory);
+
+    /* We aren't waiting for anything any more. */
+    if (waiting_directories != NULL)
+    {
+        g_hash_table_remove (waiting_directories, directory);
+    }
+
+    /* Check if any directories should wake up. */
+    async_job_wake_up ();
+}
+
+static void
+cancel_directory_count_for_file (AmmoniteDirectory *directory,
+                                 AmmoniteFile      *file)
+{
+    if (directory->details->count_in_progress != NULL &&
+        directory->details->count_in_progress->count_file == file)
+    {
+        directory_count_cancel (directory);
+    }
+}
+
+static void
+cancel_extension_info_for_file (AmmoniteDirectory *directory,
+                                AmmoniteFile      *file)
+{
+    if (directory->details->extension_info_in_progress &&
+        directory->details->extension_info_file == file)
+    {
+        extension_info_cancel (directory);
+    }
+}
+
+static void
+cancel_deep_counts_for_file (AmmoniteDirectory *directory,
+                             AmmoniteFile      *file)
+{
+    if (directory->details->deep_count_file == file)
+    {
+        deep_count_cancel (directory);
+    }
+}
+
+static void
+cancel_file_info_for_file (AmmoniteDirectory *directory,
+                           AmmoniteFile      *file)
+{
+    if (directory->details->get_info_file == file)
+    {
+        file_info_cancel (directory);
+    }
+}
+
+static void
+cancel_thumbnail_info_for_file (AmmoniteDirectory *directory,
+                                AmmoniteFile      *file)
+{
+    if (directory->details->thumbnail_info_state != NULL &&
+        directory->details->thumbnail_info_state->file == file)
+    {
+        thumbnail_info_cancel (directory);
+    }
+}
+
+static void
+cancel_thumbnail_buf_for_file (AmmoniteDirectory *directory,
+                               AmmoniteFile      *file)
+{
+    if (directory->details->thumbnail_buf_state != NULL &&
+        directory->details->thumbnail_buf_state->file == file)
+    {
+        thumbnail_buf_cancel (directory);
+    }
+}
+
+static void
+cancel_mount_for_file (AmmoniteDirectory *directory,
+                       AmmoniteFile      *file)
+{
+    if (directory->details->mount_state != NULL &&
+        directory->details->mount_state->file == file)
+    {
+        mount_cancel (directory);
+    }
+}
+
+static void
+cancel_filesystem_info_for_file (AmmoniteDirectory *directory,
+                                 AmmoniteFile      *file)
+{
+    if (directory->details->filesystem_info_state != NULL &&
+        directory->details->filesystem_info_state->file == file)
+    {
+        filesystem_info_cancel (directory);
+    }
+}
+
+static void
+cancel_loading_attributes (AmmoniteDirectory  *directory,
+                           AmmoniteAttributes  attributes)
+{
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT))
+    {
+        directory_count_cancel (directory);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DEEP_COUNT))
+    {
+        deep_count_cancel (directory);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_INFO))
+    {
+        file_info_cancel (directory);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_FILESYSTEM_INFO))
+    {
+        filesystem_info_cancel (directory);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_EXTENSION_INFO))
+    {
+        extension_info_cancel (directory);
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_INFO))
+    {
+        thumbnail_info_cancel (directory);
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_BUFFER))
+    {
+        thumbnail_buf_cancel (directory);
+    }
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_MOUNT))
+    {
+        mount_cancel (directory);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+void
+ammonite_directory_cancel_loading_attributes (AmmoniteDirectory  *directory,
+                                              AmmoniteFile       *file,
+                                              AmmoniteAttributes  attributes)
+{
+    ammonite_directory_remove_file_from_work_queue (directory, file);
+
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT))
+    {
+        cancel_directory_count_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_DEEP_COUNT))
+    {
+        cancel_deep_counts_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_INFO))
+    {
+        cancel_file_info_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_FILESYSTEM_INFO))
+    {
+        cancel_filesystem_info_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_EXTENSION_INFO))
+    {
+        cancel_extension_info_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_INFO))
+    {
+        cancel_thumbnail_info_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_THUMBNAIL_BUFFER))
+    {
+        cancel_thumbnail_buf_for_file (directory, file);
+    }
+    if (IS_ATTRIBUTE_SET (attributes, AMMONITE_ATTRIBUTE_MOUNT))
+    {
+        cancel_mount_for_file (directory, file);
+    }
+
+    ammonite_directory_async_state_changed (directory);
+}
+
+void
+ammonite_directory_add_file_to_work_queue (AmmoniteDirectory *directory,
+                                           AmmoniteFile      *file)
+{
+    g_return_if_fail (file->details->directory == directory);
+
+    ammonite_hash_queue_enqueue (directory->details->high_priority_queue,
+                                 g_object_ref (file), file);
+}
+
+
+static void
+add_all_files_to_work_queue (AmmoniteDirectory *directory)
+{
+    GList *node;
+    AmmoniteFile *file;
+
+    for (node = directory->details->file_list; node != NULL; node = node->next)
+    {
+        file = AMMONITE_FILE (node->data);
+
+        ammonite_directory_add_file_to_work_queue (directory, file);
+    }
+}
+
+void
+ammonite_directory_remove_file_from_work_queue (AmmoniteDirectory *directory,
+                                                AmmoniteFile      *file)
+{
+    ammonite_hash_queue_remove (directory->details->high_priority_queue, file);
+    ammonite_hash_queue_remove (directory->details->low_priority_queue, file);
+    ammonite_hash_queue_remove (directory->details->extension_queue, file);
+}
+
+
+static void
+move_file_to_low_priority_queue (AmmoniteDirectory *directory,
+                                 AmmoniteFile      *file)
+{
+    /* Must add before removing to avoid ref underflow */
+    ammonite_hash_queue_enqueue (directory->details->low_priority_queue,
+                                 g_object_ref (file), file);
+    ammonite_hash_queue_remove (directory->details->high_priority_queue,
+                                file);
+}
+
+static void
+move_file_to_extension_queue (AmmoniteDirectory *directory,
+                              AmmoniteFile      *file)
+{
+    /* Must add before removing to avoid ref underflow */
+    ammonite_hash_queue_enqueue (directory->details->extension_queue,
+                                 g_object_ref (file), file);
+    ammonite_hash_queue_remove (directory->details->low_priority_queue,
+                                file);
+}

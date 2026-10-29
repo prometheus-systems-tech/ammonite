@@ -1,0 +1,16 @@
+--- a/engine/dconf-engine-source-user.c	2026-10-29 15:02:26.280417313 +0200
++++ b/engine/dconf-engine-source-user.c	2026-10-29 15:02:26.300938943 +0200
+@@ -43,7 +43,12 @@
+   /* This can fail in the normal case of the user not having any
+    * settings.  That's OK and it shouldn't be considered as an error.
+    */
+-  filename = g_build_filename (g_get_user_config_dir (), "dconf", name, NULL);
++  /* Flatpak apps can read the host's database through
++   * DCONF_USER_CONFIG_DIR, a directory relative to $HOME. */
++  if (g_getenv ("DCONF_USER_CONFIG_DIR") != NULL)
++    filename = g_build_filename (g_get_home_dir (), g_getenv ("DCONF_USER_CONFIG_DIR"), name, NULL);
++  else
++    filename = g_build_filename (g_get_user_config_dir (), "dconf", name, NULL);
+   table = gvdb_table_new (filename, FALSE, NULL);
+   g_free (filename);
+ 

@@ -6,9 +6,9 @@
  * Tests for file creation operations
  */
 
-#include <nautilus-file-undo-manager.h>
-#include <nautilus-file-operations.h>
-#include <nautilus-tag-manager.h>
+#include <ammonite-file-undo-manager.h>
+#include <ammonite-file-operations.h>
+#include <ammonite-tag-manager.h>
 
 #include <gtk/gtk.h>
 
@@ -76,7 +76,7 @@ test_create_folder (void)
 
     create_test_data_init (&data);
 
-    nautilus_file_operations_new_folder (NULL,
+    ammonite_file_operations_new_folder (NULL,
                                          NULL,
                                          parent_uri,
                                          foldername,
@@ -112,7 +112,7 @@ test_create_folder_no_name (void)
 
     create_test_data_init (&data);
 
-    nautilus_file_operations_new_folder (NULL,
+    ammonite_file_operations_new_folder (NULL,
                                          NULL,
                                          parent_uri,
                                          NULL,
@@ -178,7 +178,7 @@ test_create_file (void)
 
     create_test_data_init (&data);
 
-    nautilus_file_operations_new_file (NULL,
+    ammonite_file_operations_new_file (NULL,
                                        parent_uri,
                                        filename,
                                        contents,
@@ -218,7 +218,7 @@ test_create_file_no_name (void)
 
     create_test_data_init (&data);
 
-    nautilus_file_operations_new_file (NULL,
+    ammonite_file_operations_new_file (NULL,
                                        parent_uri,
                                        NULL,
                                        contents,
@@ -284,7 +284,7 @@ test_create_file_from_template (void)
 
     create_file_with_content (template_location, contents, content_length);
 
-    nautilus_file_operations_new_file_from_template (NULL,
+    ammonite_file_operations_new_file_from_template (NULL,
                                                      parent_uri,
                                                      filename,
                                                      template_uri,
@@ -309,7 +309,7 @@ test_create_file_from_template (void)
      * resolution. */
     create_test_data_clear (&data);
     create_test_data_init (&data);
-    nautilus_file_operations_new_file_from_template (NULL,
+    ammonite_file_operations_new_file_from_template (NULL,
                                                      parent_uri,
                                                      filename,
                                                      template_uri,
@@ -388,7 +388,7 @@ test_save_image_from_texture (void)
 
     save_callback_data_init (&data);
 
-    nautilus_file_operations_save_image_from_texture (NULL,
+    ammonite_file_operations_save_image_from_texture (NULL,
                                                       NULL,
                                                       parent_uri,
                                                       image_basename,
@@ -423,7 +423,7 @@ test_save_image_from_clipboard (void)
 
     gdk_clipboard_set_texture (clipboard, texture);
 
-    nautilus_file_operations_paste_image_from_clipboard (GTK_WIDGET (box),
+    ammonite_file_operations_paste_image_from_clipboard (GTK_WIDGET (box),
                                                          NULL,
                                                          parent_uri,
                                                          save_done_callback,
@@ -444,14 +444,14 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
 
     gtk_test_init (&argc, &argv, NULL);
 
     g_setenv ("RUNNING_TESTS", "TRUE", TRUE);
 
-    undo_manager = nautilus_file_undo_manager_new ();
+    undo_manager = ammonite_file_undo_manager_new ();
     test_init_config_dir ();
 
     g_test_add_func ("/create/folder/basic",

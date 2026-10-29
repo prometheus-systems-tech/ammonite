@@ -8,9 +8,9 @@
 
 #include "test-utilities.h"
 
-#include <nautilus-application.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-thumbnails.h>
+#include <ammonite-application.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-thumbnails.h>
 
 #include <glib.h>
 #include <gio/gio.h>
@@ -40,7 +40,7 @@ thumbnailing_done_cb (GObject      *source_object,
     g_autoptr (GError) error = NULL;
     ThumbnailCallbackData *cb_data = data;
 
-    cb_data->pixbuf = nautilus_create_thumbnail_finish (res, &error);
+    cb_data->pixbuf = ammonite_create_thumbnail_finish (res, &error);
 
     cb_data->error = g_steal_pointer (&error);
     cb_data->done = TRUE;
@@ -121,7 +121,7 @@ test_thumbnail_test_queue (void)
 
         GCancellable *cancellable = g_cancellable_new ();
 
-        nautilus_create_thumbnail_async (uri, mime_type, mtime,
+        ammonite_create_thumbnail_async (uri, mime_type, mtime,
                                          cancellable, NULL, NULL);
 
         g_ptr_array_add (cancellables_array, cancellable);
@@ -137,7 +137,7 @@ test_thumbnail_test_queue (void)
         g_autofree gchar *mime_type = NULL;
         guint64 mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
 
-        nautilus_create_thumbnail_async (uri,
+        ammonite_create_thumbnail_async (uri,
                                          mime_type,
                                          mtime,
                                          NULL, NULL, NULL);
@@ -147,7 +147,7 @@ test_thumbnail_test_queue (void)
     {
         GFile *image_location = l->data;
         g_autofree gchar *image_uri = g_file_get_uri (image_location);
-        g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (image_uri);
+        g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (image_uri);
         g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
 
         ITER_CONTEXT_WHILE (!file_has_valid_thumbnail_path (image_location, thumbnail_path));
@@ -174,13 +174,13 @@ test_thumbnail_image (void)
     g_autofree gchar *mime_type = NULL;
     guint64 mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
 
-    g_assert_true (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_true (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      NULL,
@@ -216,14 +216,14 @@ test_thumbnail_old_time (void)
     g_autofree gchar *mime_type = NULL;
     guint64 mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
 
-    g_assert_true (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_true (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
     g_assert_cmpint (mtime, ==, old_mtime);
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      NULL,
@@ -258,13 +258,13 @@ test_thumbnail_image_no_mtime (void)
     make_image_file_with_mtime (image_location, mtime, FALSE);
     get_file_mime_type_and_mtime (image_location, &mime_type);
 
-    g_assert_true (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_true (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      0,
                                      NULL,
@@ -300,14 +300,14 @@ test_thumbnail_cancel (void)
     g_autofree gchar *mime_type = NULL;
 
     mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
-    g_assert_true (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_true (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_autoptr (GCancellable) cancellable = g_cancellable_new ();
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      cancellable,
@@ -339,14 +339,14 @@ test_thumbnail_overwrite (void)
     g_autofree gchar *mime_type = NULL;
     guint64 mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
 
-    g_assert_true (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_true (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_auto (ThumbnailCallbackData) thumbnailing_data1 = { NULL, FALSE, NULL };
     g_auto (ThumbnailCallbackData) thumbnailing_data2 = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      NULL,
@@ -358,7 +358,7 @@ test_thumbnail_overwrite (void)
     make_image_file (image_location, FALSE);
     mtime = get_file_mime_type_and_mtime (image_location, &mime_type);
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      NULL,
@@ -392,7 +392,7 @@ test_thumbnail_rethumbnail_failed_on_mtime_change (void)
                                                                   "Image.png",
                                                                   NULL);
     g_autofree gchar *uri = g_file_get_uri (image_location);
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_autoptr (GError) error = NULL;
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
@@ -401,7 +401,7 @@ test_thumbnail_rethumbnail_failed_on_mtime_change (void)
     g_assert_no_error (error);
 
     /* Produce a failed thumbnail */
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      "image/png",
                                      0,
                                      NULL,
@@ -427,7 +427,7 @@ test_thumbnail_rethumbnail_failed_on_mtime_change (void)
         NULL, FALSE, NULL
     };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      new_mtime,
                                      NULL,
@@ -482,9 +482,9 @@ test_thumbnail_text (void)
     g_autofree gchar *mime_type = NULL;
     guint64 mtime = get_file_mime_type_and_mtime (text_location, &mime_type);
 
-    g_assert_false (nautilus_thumbnail_is_mimetype_limited_by_size (mime_type));
+    g_assert_false (ammonite_thumbnail_is_mimetype_limited_by_size (mime_type));
 
-    if (nautilus_can_thumbnail (uri, mime_type, mtime))
+    if (ammonite_can_thumbnail (uri, mime_type, mtime))
     {
         g_test_skip ("System has a thumbnailer for text files, but this test is meant to test"
                      "a file that doesn't have one.");
@@ -493,11 +493,11 @@ test_thumbnail_text (void)
         return;
     }
 
-    g_autofree gchar *thumbnail_path = nautilus_thumbnail_get_path_for_uri (uri);
+    g_autofree gchar *thumbnail_path = ammonite_thumbnail_get_path_for_uri (uri);
     g_autoptr (GFile) thumbnail_location = g_file_new_for_path (thumbnail_path);
     g_auto (ThumbnailCallbackData) thumbnailing_data = { NULL, FALSE, NULL };
 
-    nautilus_create_thumbnail_async (uri,
+    ammonite_create_thumbnail_async (uri,
                                      mime_type,
                                      mtime,
                                      NULL,
@@ -518,19 +518,19 @@ int
 main (int   argc,
       char *argv[])
 {
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     gtk_test_init (&argc, &argv, G_TEST_OPTION_ISOLATE_DIRS, NULL);
     g_test_set_nonfatal_assertions ();
 
-    if (nautilus_application_is_sandboxed ())
+    if (ammonite_application_is_sandboxed ())
     {
         g_message ("Cannot run thumbnails tests inside a sandbox.");
 
         return 77;
     }
 
-    if (!nautilus_can_thumbnail ("file:///tmp/nautilus_tests/image.png", "image/png", 1))
+    if (!ammonite_can_thumbnail ("file:///tmp/ammonite_tests/image.png", "image/png", 1))
     {
         g_message ("System has no thumbnailer for PNGs, but most tests are meant to test "
                    "thumbnailing images.");

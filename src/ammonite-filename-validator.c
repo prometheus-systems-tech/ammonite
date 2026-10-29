@@ -1,0 +1,538 @@
+/*
+ * SPDX-FileCopyrightText: 2016 the Ammonite developers
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ */
+
+#include "ammonite-filename-validator.h"
+
+#include "ammonite-directory.h"
+#include "ammonite-file.h"
+#include "ammonite-file-utilities.h"
+#include "ammonite-filename-utilities.h"
+
+#include <glib/gi18n.h>
+#include <gtk/gtk.h>
+
+#define FILE_NAME_DUPLICATED_LABEL_TIMEOUT 500
+
+struct _AmmoniteFilenameValidator
+{
+    GObject parent_instance;
+
+    AmmoniteDirectory *containing_directory;
+    gboolean target_is_folder;
+    gboolean allow_overwrite;
+    char *original_name;
+
+    const char *feedback_text;
+    char *new_name;
+    gboolean passed;
+    gboolean valid_name;
+    gboolean duplicated_name;
+    gboolean will_overwrite;
+
+    gboolean duplicated_is_folder;
+    gint duplicated_label_timeout_id;
+};
+
+enum
+{
+    NAME_ACCEPTED,
+    LAST_SIGNAL
+};
+
+enum
+{
+    PROP_0,
+    PROP_FEEDBACK_TEXT,
+    PROP_HAS_FEEDBACK,
+    PROP_NEW_NAME,
+    PROP_CONTAINING_DIRECTORY,
+    PROP_PASSED,
+    PROP_ALLOW_OVERWRITE,
+    PROP_TARGET_IS_FOLDER,
+    PROP_WILL_OVERWRITE,
+    NUM_PROPERTIES
+};
+
+static guint signals[LAST_SIGNAL];
+static GParamSpec *properties[NUM_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE (AmmoniteFilenameValidator, ammonite_filename_validator, G_TYPE_OBJECT)
+
+void
+ammonite_filename_validator_set_target_is_folder (AmmoniteFilenameValidator *self,
+                                                  gboolean                   is_folder)
+{
+    g_object_set (self, "target-is-folder", is_folder, NULL);
+}
+
+void
+ammonite_filename_validator_set_original_name (AmmoniteFilenameValidator *self,
+                                               const char                *original_name)
+{
+    g_set_str (&self->original_name, original_name);
+}
+
+void
+ammonite_filename_validator_set_containing_directory (AmmoniteFilenameValidator *self,
+                                                      AmmoniteDirectory         *directory)
+{
+    g_assert (AMMONITE_IS_DIRECTORY (directory));
+
+    g_object_set (self, "containing-directory", directory, NULL);
+}
+
+static gboolean
+ammonite_filename_validator_is_name_too_long (AmmoniteFilenameValidator *self,
+                                              gchar                     *name)
+{
+    size_t name_length = strlen (name);
+    g_autoptr (GFile) location = ammonite_directory_get_location (self->containing_directory);
+    glong max_name_length = ammonite_get_max_child_name_length_for_location (location);
+
+    if (max_name_length == -1)
+    {
+        /* We don't know, so let's give it a chance */
+        return FALSE;
+    }
+    else
+    {
+        return name_length > (gulong) max_name_length;
+    }
+}
+
+static gboolean
+ammonite_filename_validator_ignore_existing_file (AmmoniteFilenameValidator *self,
+                                                  AmmoniteFile              *existing_file)
+{
+    return (self->original_name != NULL &&
+            ammonite_file_compare_display_name (existing_file, self->original_name) == 0);
+}
+
+gchar *
+ammonite_filename_validator_get_new_name (AmmoniteFilenameValidator *self)
+{
+    return ammonite_filename_strip (g_strdup (self->new_name));
+}
+
+static gboolean
+ammonite_filename_validator_name_is_valid (AmmoniteFilenameValidator  *self,
+                                           gchar                      *name,
+                                           gchar                     **error_message)
+{
+    gboolean is_folder = self->target_is_folder;
+    gboolean is_valid;
+
+    is_valid = TRUE;
+    if (name == NULL || strlen (name) == 0)
+    {
+        is_valid = FALSE;
+    }
+    else if (strchr (name, '/') != NULL)
+    {
+        is_valid = FALSE;
+        *error_message = is_folder ? _("Folder names cannot contain “/”") :
+                                     _("File names cannot contain “/”");
+    }
+    else if (strcmp (name, ".") == 0 || strcmp (name, "..") == 0)
+    {
+        is_valid = FALSE;
+        *error_message = is_folder ? _("A folder cannot be called “.” or “..”") :
+                                     _("A file cannot be called “.” or “..”");
+    }
+    else if (ammonite_filename_validator_is_name_too_long (self, name))
+    {
+        is_valid = FALSE;
+        *error_message = is_folder ? _("Folder name is too long") :
+                                     _("File name is too long");
+    }
+
+    if (is_valid && g_str_has_prefix (name, "."))
+    {
+        /* We must warn about the side effect */
+        *error_message = is_folder ? _("Folders with “.” at the beginning of their name are hidden") :
+                                     _("Files with “.” at the beginning of their name are hidden");
+    }
+
+    return is_valid;
+}
+
+static void
+set_feedback_text (AmmoniteFilenameValidator *self,
+                   const char                *text)
+{
+    GtkWindow *window;
+
+    if (self->feedback_text == text)
+    {
+        return;
+    }
+
+    self->feedback_text = text;
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_FEEDBACK_TEXT]);
+    g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_HAS_FEEDBACK]);
+
+    if (self->feedback_text == NULL)
+    {
+        return;
+    }
+
+    window = gtk_application_get_active_window (GTK_APPLICATION (g_application_get_default ()));
+    if (window == NULL)
+    {
+        return;
+    }
+
+    /* FIXME: Screen readers skip reading "/" at default punctuation verbosity.
+     * In the future, we should replace occurrences of "/" with "slash" spelled out. */
+
+    gtk_accessible_announce (GTK_ACCESSIBLE (window),
+                             self->feedback_text,
+                             GTK_ACCESSIBLE_ANNOUNCEMENT_PRIORITY_MEDIUM);
+}
+
+static gboolean
+duplicated_file_label_show (AmmoniteFilenameValidator *self)
+{
+    const char *text = self->duplicated_is_folder ? _("A folder with that name already exists") :
+                                                    _("A file with that name already exists");
+
+    set_feedback_text (self, text);
+
+    self->duplicated_label_timeout_id = 0;
+
+    return G_SOURCE_REMOVE;
+}
+
+static void
+filename_validator_process_new_name (AmmoniteFilenameValidator *self)
+{
+    g_return_if_fail (AMMONITE_IS_DIRECTORY (self->containing_directory));
+
+    g_object_freeze_notify (G_OBJECT (self));
+
+    g_autofree gchar *name = ammonite_filename_validator_get_new_name (self);
+    gchar *error_message = NULL;
+    g_autoptr (AmmoniteFile) existing_file = NULL;
+
+    self->valid_name = ammonite_filename_validator_name_is_valid (self,
+                                                                  name,
+                                                                  &error_message);
+
+    set_feedback_text (self, error_message);
+    existing_file = ammonite_directory_get_file_by_name (self->containing_directory, name);
+    self->duplicated_name = existing_file != NULL &&
+                            !ammonite_filename_validator_ignore_existing_file (self,
+                                                                               existing_file);
+
+    gboolean passed = (self->valid_name &&
+                       (self->allow_overwrite || !self->duplicated_name));
+
+    if (self->passed != passed)
+    {
+        self->passed = passed;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_PASSED]);
+    }
+
+    gboolean will_overwrite = (self->allow_overwrite &&
+                               self->passed &&
+                               self->duplicated_name);
+
+    if (self->will_overwrite != will_overwrite)
+    {
+        self->will_overwrite = will_overwrite;
+        g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_WILL_OVERWRITE]);
+    }
+
+    g_clear_handle_id (&self->duplicated_label_timeout_id, g_source_remove);
+
+    if (self->duplicated_name)
+    {
+        self->duplicated_is_folder = ammonite_file_is_directory (existing_file);
+    }
+
+    g_object_thaw_notify (G_OBJECT (self));
+}
+
+static void
+on_directory_info_ready_to_validate (AmmoniteDirectory *directory,
+                                     GList             *files,
+                                     gpointer           user_data)
+{
+    AmmoniteFilenameValidator *self = AMMONITE_FILENAME_VALIDATOR (user_data);
+
+    filename_validator_process_new_name (self);
+
+    /* Report duplicated file only if not other message shown (for instance,
+     * folders like "." or ".." will always exists, but we consider it as an
+     * error, not as a duplicated file or if the name is the same as the file
+     * we are renaming also don't report as a duplicated */
+    if (self->duplicated_name && self->valid_name)
+    {
+        self->duplicated_label_timeout_id = g_timeout_add (FILE_NAME_DUPLICATED_LABEL_TIMEOUT,
+                                                           (GSourceFunc) duplicated_file_label_show,
+                                                           self);
+    }
+}
+
+/**
+ * ammonite_filename_validator_validate:
+ *
+ * @self: The validator instance.
+ *
+ * Requests processing of the :new-name to check the filename is valid for the
+ * :containing-directory, possibly updating :feedback-text and :has-feedback.
+ */
+void
+ammonite_filename_validator_validate (AmmoniteFilenameValidator *self)
+{
+    g_return_if_fail (AMMONITE_IS_FILENAME_VALIDATOR (self));
+
+    if (self->containing_directory == NULL)
+    {
+        return;
+    }
+
+    g_return_if_fail (AMMONITE_IS_DIRECTORY (self->containing_directory));
+
+    ammonite_directory_call_when_ready (self->containing_directory,
+                                        AMMONITE_ATTRIBUTE_INFO | AMMONITE_ATTRIBUTE_FILE_LIST,
+                                        on_directory_info_ready_to_validate,
+                                        self);
+}
+
+static void
+on_directory_info_ready_to_try_accept (AmmoniteDirectory *directory,
+                                       GList             *files,
+                                       gpointer           user_data)
+{
+    AmmoniteFilenameValidator *self = AMMONITE_FILENAME_VALIDATOR (user_data);
+
+    filename_validator_process_new_name (self);
+
+    if (self->passed)
+    {
+        g_signal_emit (self, signals[NAME_ACCEPTED], 0);
+    }
+    else
+    {
+        /* Report duplicated file only if not other message shown (for instance,
+         * folders like "." or ".." will always exists, but we consider it as an
+         * error, not as a duplicated file) */
+        if (self->duplicated_name && self->valid_name)
+        {
+            /* Show it inmediatily since the user tried to trigger the action */
+            duplicated_file_label_show (self);
+        }
+    }
+}
+
+
+/**
+ * ammonite_filename_validator_try_accept:
+ *
+ * @self: The validator instance.
+ *
+ * Identical to ammonite_filename_validator_validate, but, additionally, the
+ * "name-accepted" sigal may get emitted if the :new-name passes the validation.
+ */
+void
+ammonite_filename_validator_try_accept (AmmoniteFilenameValidator *self)
+{
+    g_return_if_fail (AMMONITE_IS_FILENAME_VALIDATOR (self));
+    g_return_if_fail (AMMONITE_IS_DIRECTORY (self->containing_directory));
+
+    ammonite_directory_call_when_ready (self->containing_directory,
+                                        AMMONITE_ATTRIBUTE_INFO | AMMONITE_ATTRIBUTE_FILE_LIST,
+                                        on_directory_info_ready_to_try_accept,
+                                        self);
+}
+
+gboolean
+ammonite_filename_validator_get_has_feedback (AmmoniteFilenameValidator *self)
+{
+    return (self->feedback_text != NULL);
+}
+
+static void
+ammonite_filename_validator_init (AmmoniteFilenameValidator *self)
+{
+}
+
+static void
+ammonite_filename_validator_get_property (GObject    *object,
+                                          guint       prop_id,
+                                          GValue     *value,
+                                          GParamSpec *pspec)
+{
+    AmmoniteFilenameValidator *self = AMMONITE_FILENAME_VALIDATOR (object);
+
+    switch (prop_id)
+    {
+        case PROP_FEEDBACK_TEXT:
+        {
+            g_value_set_string (value, self->feedback_text);
+        }
+        break;
+
+        case PROP_HAS_FEEDBACK:
+        {
+            g_value_set_boolean (value, ammonite_filename_validator_get_has_feedback (self));
+        }
+        break;
+
+        case PROP_NEW_NAME:
+        {
+            g_value_take_string (value,
+                                 ammonite_filename_validator_get_new_name (self));
+        }
+        break;
+
+        case PROP_PASSED:
+        {
+            g_value_set_boolean (value, self->passed);
+        }
+        break;
+
+        case PROP_WILL_OVERWRITE:
+        {
+            g_value_set_boolean (value, self->will_overwrite);
+        }
+        break;
+
+        default:
+        {
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        }
+        break;
+    }
+}
+
+static void
+ammonite_filename_validator_set_property (GObject      *object,
+                                          guint         prop_id,
+                                          const GValue *value,
+                                          GParamSpec   *pspec)
+{
+    AmmoniteFilenameValidator *self = AMMONITE_FILENAME_VALIDATOR (object);
+
+    switch (prop_id)
+    {
+        case PROP_NEW_NAME:
+        {
+            g_set_str (&self->new_name, g_value_get_string (value));
+        }
+        break;
+
+        case PROP_CONTAINING_DIRECTORY:
+        {
+            g_clear_object (&self->containing_directory);
+
+            self->containing_directory = AMMONITE_DIRECTORY (g_value_dup_object (value));
+        }
+        break;
+
+        case PROP_ALLOW_OVERWRITE:
+        {
+            self->allow_overwrite = g_value_get_boolean (value);
+        }
+        break;
+
+        case PROP_TARGET_IS_FOLDER:
+        {
+            self->target_is_folder = g_value_get_boolean (value);
+        }
+        break;
+
+        default:
+        {
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+        }
+        break;
+    }
+}
+
+static void
+ammonite_filename_validator_finalize (GObject *object)
+{
+    AmmoniteFilenameValidator *self = AMMONITE_FILENAME_VALIDATOR (object);
+
+    if (self->containing_directory != NULL)
+    {
+        ammonite_directory_cancel_callback (self->containing_directory,
+                                            on_directory_info_ready_to_validate,
+                                            self);
+        ammonite_directory_cancel_callback (self->containing_directory,
+                                            on_directory_info_ready_to_try_accept,
+                                            self);
+        g_clear_object (&self->containing_directory);
+    }
+
+    g_clear_handle_id (&self->duplicated_label_timeout_id, g_source_remove);
+    g_free (self->original_name);
+    g_free (self->new_name);
+
+    G_OBJECT_CLASS (ammonite_filename_validator_parent_class)->finalize (object);
+}
+
+static void
+ammonite_filename_validator_class_init (AmmoniteFilenameValidatorClass *klass)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    object_class->get_property = ammonite_filename_validator_get_property;
+    object_class->set_property = ammonite_filename_validator_set_property;
+    object_class->finalize = ammonite_filename_validator_finalize;
+
+    signals[NAME_ACCEPTED] =
+        g_signal_new ("name-accepted",
+                      G_TYPE_FROM_CLASS (klass),
+                      G_SIGNAL_RUN_FIRST,
+                      0,
+                      NULL, NULL,
+                      g_cclosure_marshal_generic,
+                      G_TYPE_NONE, 0);
+
+    properties[PROP_FEEDBACK_TEXT] =
+        g_param_spec_string ("feedback-text", NULL, NULL,
+                             NULL,
+                             G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_HAS_FEEDBACK] =
+        g_param_spec_boolean ("has-feedback", NULL, NULL,
+                              FALSE,
+                              G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_NEW_NAME] =
+        g_param_spec_string ("new-name", NULL, NULL,
+                             NULL,
+                             G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_PASSED] =
+        g_param_spec_boolean ("passed", NULL, NULL,
+                              FALSE,
+                              G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_CONTAINING_DIRECTORY] =
+        g_param_spec_object ("containing-directory", NULL, NULL,
+                             AMMONITE_TYPE_DIRECTORY,
+                             G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_ALLOW_OVERWRITE] =
+        g_param_spec_boolean ("allow-overwrite", NULL, NULL,
+                              FALSE,
+                              G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_TARGET_IS_FOLDER] =
+        g_param_spec_boolean ("target-is-folder", NULL, NULL,
+                              FALSE,
+                              G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS);
+    properties[PROP_WILL_OVERWRITE] =
+        g_param_spec_boolean ("will-overwrite", NULL, NULL,
+                              FALSE,
+                              G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+
+    g_object_class_install_properties (object_class, NUM_PROPERTIES, properties);
+}
+
+gboolean
+ammonite_filename_validator_get_will_overwrite (AmmoniteFilenameValidator *self)
+{
+    return self->will_overwrite;
+}

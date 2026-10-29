@@ -1,10 +1,10 @@
 #include "test-utilities.h"
 
-#include <src/nautilus-file-operations.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-file-utilities.h>
-#include <src/nautilus-progress-info-manager.h>
-#include <src/nautilus-tag-manager.h>
+#include <src/ammonite-file-operations.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-file-utilities.h>
+#include <src/ammonite-progress-info-manager.h>
+#include <src/ammonite-tag-manager.h>
 
 #define SKIP_IF_ROOT() \
         if (getuid () == 0) \
@@ -69,7 +69,7 @@ test_trash_one_file (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_trash_or_delete_async (files,
+    ammonite_file_operations_trash_or_delete_async (files,
                                                     NULL,
                                                     NULL,
                                                     delete_callback,
@@ -101,7 +101,7 @@ trash_or_delete_multiple_files (const gchar *prefix,
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_trash_or_delete_async (files,
+    ammonite_file_operations_trash_or_delete_async (files,
                                                     NULL,
                                                     NULL,
                                                     delete_callback,
@@ -130,7 +130,7 @@ delete_multiple_files (const gchar *prefix,
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -208,7 +208,7 @@ test_delete_one_file (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -268,7 +268,7 @@ test_trash_one_empty_directory (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_trash_or_delete_async (files,
+    ammonite_file_operations_trash_or_delete_async (files,
                                                     NULL,
                                                     NULL,
                                                     delete_callback,
@@ -327,7 +327,7 @@ test_delete_one_empty_directory (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -390,7 +390,7 @@ test_trash_full_directory (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_trash_or_delete_async (files,
+    ammonite_file_operations_trash_or_delete_async (files,
                                                     NULL,
                                                     NULL,
                                                     delete_callback,
@@ -429,7 +429,7 @@ test_trash_first_hierarchy (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_trash_or_delete_async (files,
+    ammonite_file_operations_trash_or_delete_async (files,
                                                     NULL,
                                                     NULL,
                                                     delete_callback,
@@ -499,7 +499,7 @@ test_delete_full_directory (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -538,7 +538,7 @@ test_delete_first_hierarchy (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -612,7 +612,7 @@ test_delete_file_no_permission (void)
     set_permissions (first_dir, DIRECTORY_PERMISSIONS_READ_ONLY);
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = file },
+    ammonite_file_operations_delete_async (&(GList){ .data = file },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -644,7 +644,7 @@ test_delete_directory_no_permission (void)
     set_permissions (first_dir, DIRECTORY_PERMISSIONS_READ_ONLY);
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = enclosed_dir },
+    ammonite_file_operations_delete_async (&(GList){ .data = enclosed_dir },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -676,7 +676,7 @@ test_delete_enclosed_file_no_permission (void)
     set_permissions (first_dir, DIRECTORY_PERMISSIONS_READ_ONLY);
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_delete_async (&(GList){ .data = first_dir },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -709,7 +709,7 @@ test_delete_enclosed_directory_no_permission (void)
     set_permissions (first_dir, DIRECTORY_PERMISSIONS_READ_ONLY);
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_delete_async (&(GList){ .data = first_dir },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -746,7 +746,7 @@ test_delete_one_file_cancel (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = file },
+    ammonite_file_operations_delete_async (&(GList){ .data = file },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -785,7 +785,7 @@ test_delete_more_files_cancel (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (files,
+    ammonite_file_operations_delete_async (files,
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -821,7 +821,7 @@ test_delete_full_directory_cancel (void)
 
     delete_callback_data_init (&data);
 
-    nautilus_file_operations_delete_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_delete_async (&(GList){ .data = first_dir },
                                            NULL,
                                            NULL,
                                            delete_callback,
@@ -890,17 +890,17 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusProgressInfoManager) progress_manager = NULL;
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteProgressInfoManager) progress_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
     int ret;
 
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
-    progress_manager = nautilus_progress_info_manager_dup_singleton ();
-    undo_manager = nautilus_file_undo_manager_new ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    ammonite_ensure_extension_points ();
+    progress_manager = ammonite_progress_info_manager_dup_singleton ();
+    undo_manager = ammonite_file_undo_manager_new ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
 
     setup_test_suite ();
 

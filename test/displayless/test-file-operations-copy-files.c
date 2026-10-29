@@ -1,9 +1,9 @@
 #include "test-utilities.h"
 
-#include <src/nautilus-file-operations.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-file-utilities.h>
-#include <src/nautilus-tag-manager.h>
+#include <src/ammonite-file-operations.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-file-utilities.h>
+#include <src/ammonite-tag-manager.h>
 
 typedef struct
 {
@@ -65,7 +65,7 @@ test_copy_one_file (void)
     create_one_file ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = file },
+    ammonite_file_operations_copy_async (&(GList){ .data = file },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -106,7 +106,7 @@ test_copy_one_empty_directory (void)
     create_one_empty_directory ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = file },
+    ammonite_file_operations_copy_async (&(GList){ .data = file },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -162,7 +162,7 @@ run_dup_testcases (DuplicateTestCase test_cases[],
         gboolean success = FALSE;
 
         file_hierarchy_create (file_hierarchy, "");
-        nautilus_file_operations_duplicate (file_list,
+        ammonite_file_operations_duplicate (file_list,
                                             NULL,
                                             NULL,
                                             duplicate_callback,
@@ -355,7 +355,7 @@ copy_multiple_files (const gchar *prefix,
     }
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (files,
+    ammonite_file_operations_copy_async (files,
                                          dest,
                                          NULL,
                                          NULL,
@@ -585,7 +585,7 @@ test_copy_full_directory (void)
     create_one_file ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -641,7 +641,7 @@ test_copy_first_hierarchy (void)
     create_first_hierarchy ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -696,7 +696,7 @@ test_copy_second_hierarchy (void)
     create_second_hierarchy ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -758,7 +758,7 @@ test_copy_third_hierarchy (void)
     create_third_hierarchy ("copy");
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          second_dir,
                                          NULL,
                                          NULL,
@@ -825,7 +825,7 @@ test_copy_fourth_hierarchy (void)
     files = g_list_prepend (files, g_object_ref (second_dir));
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (files,
+    ammonite_file_operations_copy_async (files,
                                          third_dir,
                                          NULL,
                                          NULL,
@@ -866,10 +866,10 @@ test_copy_hierarchy_error_into_itself (void)
     file_hierarchy_create (source_hierarchy, "");
 
     /* Clear to check for the copy operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          test_dir,
                                          NULL,
                                          NULL,
@@ -881,9 +881,9 @@ test_copy_hierarchy_error_into_itself (void)
     g_assert_true (data.success);
 
     file_hierarchy_assert_exists (source_hierarchy, "", TRUE);
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -917,10 +917,10 @@ test_copy_hierarchy_error_into_subdir (void)
     file_hierarchy_create (source_hierarchy, "");
 
     /* Clear to check for the copy operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
     copy_test_data_init (&data);
-    nautilus_file_operations_copy_async (&(GList){ .data = first_dir },
+    ammonite_file_operations_copy_async (&(GList){ .data = first_dir },
                                          first_child,
                                          NULL,
                                          NULL,
@@ -933,9 +933,9 @@ test_copy_hierarchy_error_into_subdir (void)
 
     file_hierarchy_assert_exists (source_hierarchy, "", TRUE);
     file_hierarchy_assert_exists (unexpected_hierarchy, "", FALSE);
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -985,15 +985,15 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
     int ret;
 
-    undo_manager = nautilus_file_undo_manager_new ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    undo_manager = ammonite_file_undo_manager_new ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     setup_test_suite ();
 

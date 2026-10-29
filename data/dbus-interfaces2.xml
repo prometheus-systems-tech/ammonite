@@ -22,8 +22,8 @@
 -->
 
 <!--
-  org.gnome.Nautilus.FileOperations2:
-  @short_description: Nautilus File Operations D-Bus interface
+  org.ammonite.Ammonite.FileOperations2:
+  @short_description: Ammonite File Operations D-Bus interface
 
   This API is meant to be consumed by desktop components, and optimized
   for their needs. This API is considered private and must not be used
@@ -37,7 +37,7 @@
   - timestamp (u): the timestamp of the user interaction
 -->
 <node xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
-  <interface name='org.gnome.Nautilus.FileOperations2'>
+  <interface name='org.ammonite.Ammonite.FileOperations2'>
 
     <method name='CopyURIs'>
       <arg type='as' name='sources' direction='in'/>

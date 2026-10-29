@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <nautilus-extension.h>
+#include <ammonite-extension.h>
 
 #define AUDIO_VIDEO_TYPE_PROPERTIES_MODEL (audio_video_properties_model_get_type ())
 
@@ -16,5 +16,5 @@ G_DECLARE_FINAL_TYPE (AudioVideoPropertiesModel, audio_video_properties_model,
 GType                    audio_video_properties_model_get_type      (void);
 void                     audio_video_properties_model_register_type (GTypeModule *module);
 
-NautilusPropertiesModel *
+AmmonitePropertiesModel *
 audio_video_properties_model_new (const char *location);

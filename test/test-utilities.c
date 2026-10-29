@@ -10,38 +10,38 @@
 
 #include <sys/random.h>
 #include <sys/types.h>
-#include <nautilus-file.h>
-#include <nautilus-directory.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-progress-info.h>
-#include <src/nautilus-progress-info-manager.h>
-#include <nautilus-thumbnails.h>
+#include <ammonite-file.h>
+#include <ammonite-directory.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-progress-info.h>
+#include <src/ammonite-progress-info-manager.h>
+#include <ammonite-thumbnails.h>
 
 #include <glycin.h>
 
-static gchar *nautilus_tmp_dir = NULL;
+static gchar *ammonite_tmp_dir = NULL;
 
 const gchar *
 test_get_tmp_dir (void)
 {
-    if (nautilus_tmp_dir == NULL)
+    if (ammonite_tmp_dir == NULL)
     {
-        nautilus_tmp_dir = g_dir_make_tmp ("nautilus.XXXXXX", NULL);
+        ammonite_tmp_dir = g_dir_make_tmp ("ammonite.XXXXXX", NULL);
     }
 
-    return nautilus_tmp_dir;
+    return ammonite_tmp_dir;
 }
 
 void
 test_clear_tmp_dir (void)
 {
-    if (nautilus_tmp_dir != NULL)
+    if (ammonite_tmp_dir != NULL)
     {
-        g_autoptr (GFile) tmp_dir = g_file_new_for_path (nautilus_tmp_dir);
+        g_autoptr (GFile) tmp_dir = g_file_new_for_path (ammonite_tmp_dir);
 
         empty_directory_by_prefix (tmp_dir, "");
-        rmdir (nautilus_tmp_dir);
-        g_clear_pointer (&nautilus_tmp_dir, g_free);
+        rmdir (ammonite_tmp_dir);
+        g_clear_pointer (&ammonite_tmp_dir, g_free);
     }
 }
 
@@ -316,18 +316,18 @@ test_operation_undo (void)
     g_main_context_push_thread_default (context);
     loop = g_main_loop_new (context, FALSE);
 
-    handler_id = g_signal_connect_swapped (nautilus_file_undo_manager_get (),
+    handler_id = g_signal_connect_swapped (ammonite_file_undo_manager_get (),
                                            "undo-changed",
                                            G_CALLBACK (g_main_loop_quit),
                                            loop);
 
-    nautilus_file_undo_manager_undo (NULL, NULL);
+    ammonite_file_undo_manager_undo (NULL, NULL);
 
     g_main_loop_run (loop);
 
     g_main_context_pop_thread_default (context);
 
-    g_signal_handler_disconnect (nautilus_file_undo_manager_get (),
+    g_signal_handler_disconnect (ammonite_file_undo_manager_get (),
                                  handler_id);
 }
 
@@ -342,18 +342,18 @@ test_operation_redo (void)
     g_main_context_push_thread_default (context);
     loop = g_main_loop_new (context, FALSE);
 
-    handler_id = g_signal_connect_swapped (nautilus_file_undo_manager_get (),
+    handler_id = g_signal_connect_swapped (ammonite_file_undo_manager_get (),
                                            "undo-changed",
                                            G_CALLBACK (g_main_loop_quit),
                                            loop);
 
-    nautilus_file_undo_manager_redo (NULL, NULL);
+    ammonite_file_undo_manager_redo (NULL, NULL);
 
     g_main_loop_run (loop);
 
     g_main_context_pop_thread_default (context);
 
-    g_signal_handler_disconnect (nautilus_file_undo_manager_get (),
+    g_signal_handler_disconnect (ammonite_file_undo_manager_get (),
                                  handler_id);
 }
 
@@ -371,36 +371,36 @@ test_operation_undo_redo (void)
     g_main_context_push_thread_default (context);
     loop = g_main_loop_new (context, FALSE);
 
-    handler_id = g_signal_connect_swapped (nautilus_file_undo_manager_get (),
+    handler_id = g_signal_connect_swapped (ammonite_file_undo_manager_get (),
                                            "undo-changed",
                                            G_CALLBACK (g_main_loop_quit),
                                            loop);
 
-    nautilus_file_undo_manager_redo (NULL, NULL);
+    ammonite_file_undo_manager_redo (NULL, NULL);
 
     g_main_loop_run (loop);
 
     g_main_context_pop_thread_default (context);
 
-    g_signal_handler_disconnect (nautilus_file_undo_manager_get (),
+    g_signal_handler_disconnect (ammonite_file_undo_manager_get (),
                                  handler_id);
 }
 
-/* Requires the NautilusProgressInfoManager to be initialized. */
+/* Requires the AmmoniteProgressInfoManager to be initialized. */
 void
 test_operation_cancel (void)
 {
-    g_autoptr (NautilusProgressInfoManager) progress_manager =
-        nautilus_progress_info_manager_dup_singleton ();
-    GList *progress_infos = nautilus_progress_info_manager_get_all_infos (progress_manager);
-    NautilusProgressInfo *info;
+    g_autoptr (AmmoniteProgressInfoManager) progress_manager =
+        ammonite_progress_info_manager_dup_singleton ();
+    GList *progress_infos = ammonite_progress_info_manager_get_all_infos (progress_manager);
+    AmmoniteProgressInfo *info;
 
     g_assert_nonnull (progress_infos);
 
     /* New progress infos are prepended, so the current operation's info is
      * always the first one. */
     info = progress_infos->data;
-    nautilus_progress_info_cancel (info);
+    ammonite_progress_info_cancel (info);
 }
 
 void
@@ -617,7 +617,7 @@ create_random_file (GFile *file,
 }
 
 static void
-file_ready_cb (NautilusFile *file,
+file_ready_cb (AmmoniteFile *file,
                gpointer      callback_data)
 {
     gboolean *done = callback_data;
@@ -626,12 +626,12 @@ file_ready_cb (NautilusFile *file,
 }
 
 void
-file_load_attributes (NautilusFile       *file,
-                      NautilusAttributes  attributes)
+file_load_attributes (AmmoniteFile       *file,
+                      AmmoniteAttributes  attributes)
 {
     gboolean done = FALSE;
 
-    nautilus_file_call_when_ready (file,
+    ammonite_file_call_when_ready (file,
                                    attributes,
                                    file_ready_cb,
                                    &done);
@@ -640,8 +640,8 @@ file_load_attributes (NautilusFile       *file,
 }
 
 static void
-directory_ready_cb (NautilusDirectory *directory,
-                    NautilusFileList  *files,
+directory_ready_cb (AmmoniteDirectory *directory,
+                    AmmoniteFileList  *files,
                     gpointer           user_data)
 {
     gboolean *ready = user_data;
@@ -651,12 +651,12 @@ directory_ready_cb (NautilusDirectory *directory,
 
 /* Wait until the file list and the info of all files are loaded. */
 void
-directory_load_attributes (NautilusDirectory  *directory,
-                           NautilusAttributes  attributes)
+directory_load_attributes (AmmoniteDirectory  *directory,
+                           AmmoniteAttributes  attributes)
 {
     gboolean ready = FALSE;
 
-    nautilus_directory_call_when_ready (directory,
+    ammonite_directory_call_when_ready (directory,
                                         attributes,
                                         directory_ready_cb, &ready);
 
@@ -744,7 +744,7 @@ make_image_file_full (GFile   *file,
         g_autoptr (GMainLoop) loop = g_main_loop_new (NULL, FALSE);
         g_autofree char *uri = g_file_get_uri (file);
 
-        nautilus_create_thumbnail_async (uri, "image/png",
+        ammonite_create_thumbnail_async (uri, "image/png",
                                          mtime,
                                          NULL,
                                          loop_quit_cb,

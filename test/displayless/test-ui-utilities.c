@@ -1,6 +1,6 @@
 #include <glib.h>
 
-#include <nautilus-ui-utilities.h>
+#include <ammonite-ui-utilities.h>
 
 
 static void
@@ -8,17 +8,17 @@ test_string_capitalization (void)
 {
     char *capitalized;
 
-    g_assert_null (nautilus_capitalize_str (NULL));
+    g_assert_null (ammonite_capitalize_str (NULL));
 
-    capitalized = nautilus_capitalize_str ("");
+    capitalized = ammonite_capitalize_str ("");
     g_assert_cmpstr (capitalized, ==, "");
     g_free (capitalized);
 
-    capitalized = nautilus_capitalize_str ("foo");
+    capitalized = ammonite_capitalize_str ("foo");
     g_assert_cmpstr (capitalized, ==, "Foo");
     g_free (capitalized);
 
-    capitalized = nautilus_capitalize_str ("Foo");
+    capitalized = ammonite_capitalize_str ("Foo");
     g_assert_cmpstr (capitalized, ==, "Foo");
     g_free (capitalized);
 }

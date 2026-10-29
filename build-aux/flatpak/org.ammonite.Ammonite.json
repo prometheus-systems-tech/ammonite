@@ -1,0 +1,284 @@
+{
+  "app-id": "org.ammonite.Ammonite.Devel",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "master",
+  "sdk": "org.gnome.Sdk",
+  "command": "ammonite",
+  "tags": [
+    "devel",
+    "development",
+    "nightly"
+  ],
+  "finish-args": [
+    "--device=dri",
+    "--share=ipc",
+    "--socket=x11",
+    "--socket=wayland",
+    "--talk-name=org.gnome.OnlineAccounts",
+    "--filesystem=host",
+    "--filesystem=/tmp",
+    "--talk-name=org.gtk.vfs.*",
+    "--talk-name=org.gtk.MountOperationHandler",
+    "--filesystem=xdg-run/gvfsd",
+    "--filesystem=xdg-run/dconf",
+    "--filesystem=~/.config/dconf:ro",
+    "--talk-name=ca.desrt.dconf",
+    "--talk-name=org.ammonite.AmmonitePreviewer",
+    "--talk-name=org.ammonite.AmmonitePreviewer.Devel",
+    "--talk-name=org.gnome.DiskUtility",
+    "--talk-name=org.gnome.Settings",
+    "--talk-name=org.gnome.Console",
+    "--talk-name=org.gnome.Mutter.ServiceChannel",
+    "--env=DCONF_USER_CONFIG_DIR=.config/dconf",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:Audio",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:Documents",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:FileSystem",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:Pictures",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:Music",
+    "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:Video",
+    "--env=GIO_EXTRA_MODULES=/app/lib/gio/modules"
+  ],
+  "modules": [
+    {
+      "name": "inih",
+      "buildsystem": "meson",
+      "config-opts": [
+        "-Ddefault_library=shared",
+        "-Ddistro_install=true",
+        "-Dwith_INIReader=true",
+        "-Dtests=false"
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/benhoyt/inih/archive/refs/tags/r62.tar.gz",
+          "sha256": "9c15fa751bb8093d042dae1b9f125eb45198c32c6704cd5481ccde460d4f8151"
+        }
+      ]
+    },
+    {
+      "name": "exiv2",
+      "config-opts": [
+        "-DCMAKE_INSTALL_PREFIX=/app",
+        "-DCMAKE_INSTALL_LIBDIR=/app/lib"
+      ],
+      "buildsystem": "cmake-ninja",
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/Exiv2/exiv2.git",
+          "branch": "0.28.x"
+        }
+      ]
+    },
+    {
+      "name": "gexiv2",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "-Dintrospection=false",
+        "-Dvapi=false",
+        "-Dtools=false",
+        "-Dpython3=false"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/gexiv2.git",
+          "tag": "0.16.0"
+        }
+      ]
+    },
+    {
+      "name": "localsearch",
+      "buildsystem": "meson",
+      "cleanup": [
+        "/bin",
+        "/etc"
+      ],
+      "config-opts": [
+        "-Dfunctional_tests=false",
+        "-Dsandbox_tests=false",
+        "-Ddomain_prefix=org.ammonite.Ammonite.Devel",
+        "-Dextract=true",
+        "-Dlandlock=disabled",
+        "-Dman=false",
+        "-Dminer_fs=true",
+        "-Dminer_fs_cache_location=$XDG_CACHE_HOME/ammonite/miner/files",
+        "-Dsystemd_user_services=false",
+        "-Dwriteback=false",
+        "-Dbattery_detection=none"
+      ],
+      "post-install": [
+        "echo 'Removing quotations from DBus service files'",
+        "ls -alh /app/share/dbus-1/services/org.*",
+        "sed -i 's/\"//g' /app/share/dbus-1/services/org.*"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/localsearch.git",
+          "branch": "main"
+        }
+      ]
+    },
+    {
+      "name": "gnome-desktop",
+      "buildsystem": "meson",
+      "config-opts": [
+        "-Ddebug_tools=false",
+        "-Ddesktop_docs=false",
+        "-Dlegacy_library=false",
+        "-Dsystemd=disabled",
+        "-Dudev=disabled",
+        "-Dqr=disabled"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/gnome-desktop.git"
+        },
+        {
+          "type": "shell",
+          "//": "flatpak-spawn thumbnailer sub-sandboxes are unreliable on some Flatpak versions (e.g. 1.16 on EL10: '--clear-env' and '--env-fd' failures), so every thumbnail fails. Ammonite is already sandboxed, so run thumbnailers directly inside it.",
+          "commands": [
+            "sed -i 's/exec->sandbox = SANDBOX_TYPE_FLATPAK;/exec->sandbox = SANDBOX_TYPE_NONE;/' libgnome-desktop/gnome-desktop-thumbnail-script.c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gnome-autoar",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "-Dintrospection=disabled"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/gnome-autoar.git",
+          "branch": "main"
+        }
+      ]
+    },
+    {
+      "name": "libportal",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "-Dbackend-gtk4=enabled",
+        "-Dbackend-gtk3=disabled",
+        "-Ddocs=false",
+        "-Dintrospection=false",
+        "-Dtests=false",
+        "-Dvapi=false",
+        "--buildtype=debugoptimized"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://github.com/flatpak/libportal.git",
+          "branch": "main"
+        }
+      ]
+    },
+    {
+      "name": "libcloudproviders",
+      "buildsystem": "meson",
+      "builddir": true,
+      "config-opts": [
+        "-Dintrospection=false",
+        "-Dvapigen=false"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/libcloudproviders.git"
+        }
+      ]
+    },
+    {
+      "name": "video-thumbnailer",
+      "buildsystem": "simple",
+      "//": "Video thumbnails via the ffmpeg shipped in the runtime",
+      "build-commands": [
+        "install -Dm644 ffmpeg-video.thumbnailer -t /app/share/thumbnailers"
+      ],
+      "sources": [
+        {
+          "type": "inline",
+          "dest-filename": "ffmpeg-video.thumbnailer",
+          "contents": "[Thumbnailer Entry]\nTryExec=/usr/bin/ffmpeg\nExec=/usr/bin/ffmpeg -y -loglevel error -i %i -vf thumbnail,scale=%s:%s:force_original_aspect_ratio=decrease -frames:v 1 -f image2 -c:v png %o\nMimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/ogg;video/x-flv;video/3gpp;video/x-ms-wmv;video/mp2t;video/x-m4v;video/x-ogm+ogg;\n"
+        }
+      ]
+    },
+    {
+      "name": "dconf",
+      "buildsystem": "meson",
+      "//": "The GNOME Nightly runtime no longer ships the dconf GSettings backend, so without this GSettings falls back to a private keyfile and the host's font, text scaling and other desktop settings are never seen. It also gets a small patch so that DCONF_USER_CONFIG_DIR (set in finish-args) points it at the host database",
+      "config-opts": [
+        "-Dbash_completion=false",
+        "-Dman=false",
+        "-Dvapi=false",
+        "-Dgtk_doc=false"
+      ],
+      "cleanup": [
+        "/bin",
+        "/etc",
+        "/libexec",
+        "/share/dbus-1",
+        "/lib/systemd",
+        "/include",
+        "/lib/pkgconfig",
+        "/share/bash-completion"
+      ],
+      "sources": [
+        {
+          "type": "git",
+          "url": "https://gitlab.gnome.org/GNOME/dconf.git",
+          "tag": "51.0"
+        },
+        {
+          "type": "patch",
+          "path": "dconf-user-config-dir.patch"
+        }
+      ]
+    },
+    {
+      "buildsystem": "meson",
+      "run-tests": true,
+      "builddir": true,
+      "name": "ammonite",
+      "build-options": {
+        "test-args": [
+          "--device=dri",
+          "--share=ipc",
+          "--socket=fallback-x11",
+          "--socket=wayland",
+          "--talk-name=org.gtk.vfs.*",
+          "--talk-name=org.gtk.MountOperationHandler",
+          "--filesystem=xdg-run/gvfsd",
+          "--env=GIO_USE_VFS=local",
+          "--add-policy=LocalSearch3.dbus:org.freedesktop.Tracker3.Miner.Files=tracker:FileSystem"
+        ]
+      },
+      "config-opts": [
+        "-Dprofile=Devel",
+        "-Dtests=all"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../.."
+        },
+        {
+          "type": "archive",
+          "url": "https://gitlab.gnome.org/GNOME/libgxdp/-/archive/df896e3412b749947bc6f62a91a1aac8e6b6d19b/libgxdp-df896e3412b749947bc6f62a91a1aac8e6b6d19b.tar.gz",
+          "sha256": "501f39e913c21c951ff8926f0056f846c2c738a66cce06d5b3637c9110f5a92d",
+          "dest": "subprojects/libgxdp"
+        }
+      ]
+    }
+  ]
+}

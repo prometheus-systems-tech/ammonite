@@ -1,6 +1,6 @@
 #include <glib.h>
 
-#include "nautilus-filename-utilities.h"
+#include "ammonite-filename-utilities.h"
 
 
 static void
@@ -14,7 +14,7 @@ test_has_large_enough_common_prefix (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_cmpstr ("foo-1.t", ==, actual);
 }
 
@@ -29,7 +29,7 @@ test_has_common_prefix_that_equals_the_min_required_length (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_cmpstr ("food", ==, actual);
 }
 
@@ -44,7 +44,7 @@ test_has_common_prefix_that_equals_the_min_required_length2 (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_cmpstr ("food", ==, actual);
 }
 
@@ -63,7 +63,7 @@ test_many_strings_with_common_prefix (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_cmpstr ("some text that ", ==, actual);
 }
 
@@ -78,7 +78,7 @@ test_strings_with_unicode_characters_that_have_common_prefix (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_cmpstr ("ƹƱƱƬ", ==, actual);
 }
 
@@ -93,7 +93,7 @@ test_no_common_prefix (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_null (actual);
 }
 
@@ -108,7 +108,7 @@ test_has_common_prefix_but_smaller_than_min_required_length (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_null (actual);
 }
 
@@ -123,7 +123,7 @@ test_first_character_differs (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_null (actual);
 }
 
@@ -138,7 +138,7 @@ test_strings_with_unicode_characters_that_dont_have_common_prefix (void)
         NULL
     };
 
-    actual = nautilus_filename_get_common_prefix (list, 4);
+    actual = ammonite_filename_get_common_prefix (list, 4);
     g_assert_null (actual);
 }
 

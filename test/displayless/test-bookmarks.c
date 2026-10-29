@@ -1,9 +1,9 @@
 #define G_LOG_DOMAIN "test-bookmarks"
 
-#include <nautilus-bookmark-list.h>
-#include <nautilus-bookmark.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-file.h>
+#include <ammonite-bookmark-list.h>
+#include <ammonite-bookmark.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-file.h>
 
 #include <test-utilities.h>
 
@@ -15,20 +15,20 @@ test_bookmark (void)
     g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (),
                                                             "my_bookmark",
                                                             NULL);
-    g_autoptr (NautilusBookmark) bookmark = nautilus_bookmark_new (location, NULL);
-    GFile *bookmark_location = nautilus_bookmark_get_location (bookmark);
-    g_autoptr (NautilusFile) file = nautilus_file_get (location);
+    g_autoptr (AmmoniteBookmark) bookmark = ammonite_bookmark_new (location, NULL);
+    GFile *bookmark_location = ammonite_bookmark_get_location (bookmark);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
     const gchar *custom_name = "My Custom Bookmark";
-    g_autoptr (GIcon) icon = nautilus_bookmark_get_icon (bookmark);
-    g_autoptr (GIcon) symbolic_icon = nautilus_bookmark_get_symbolic_icon (bookmark);
+    g_autoptr (GIcon) icon = ammonite_bookmark_get_icon (bookmark);
+    g_autoptr (GIcon) symbolic_icon = ammonite_bookmark_get_symbolic_icon (bookmark);
 
     g_assert_true (g_file_equal (location, bookmark_location));
-    g_assert_cmpstr (nautilus_file_get_display_name (file),
+    g_assert_cmpstr (ammonite_file_get_display_name (file),
                      ==,
-                     nautilus_bookmark_get_name (bookmark));
+                     ammonite_bookmark_get_name (bookmark));
 
-    nautilus_bookmark_set_name (bookmark, custom_name);
-    g_assert_cmpstr (custom_name, ==, nautilus_bookmark_get_name (bookmark));
+    ammonite_bookmark_set_name (bookmark, custom_name);
+    g_assert_cmpstr (custom_name, ==, ammonite_bookmark_get_name (bookmark));
 
     g_assert_nonnull (icon);
     g_assert_nonnull (symbolic_icon);
@@ -65,54 +65,54 @@ test_bookmark_list_basic (void)
 {
     const char *tmp_dir = test_get_tmp_dir ();
     g_autoptr (GFile) bookmarks_list_file = setup_tmp_bookmarks_file (tmp_dir);
-    g_autoptr (NautilusBookmarkList) list = nautilus_bookmark_list_new ();
+    g_autoptr (AmmoniteBookmarkList) list = ammonite_bookmark_list_new ();
     g_autoptr (GFile) bookmark1 = g_file_new_build_filename (tmp_dir, "one", NULL);
     g_autoptr (GFile) bookmark2 = g_file_new_build_filename (tmp_dir, "two", NULL);
 
     g_assert_true (g_file_query_exists (bookmarks_list_file, NULL));
     g_assert_nonnull (list);
-    g_assert_false (nautilus_bookmark_list_contains (list, bookmark1));
-    g_assert_false (nautilus_bookmark_list_contains (list, bookmark2));
+    g_assert_false (ammonite_bookmark_list_contains (list, bookmark1));
+    g_assert_false (ammonite_bookmark_list_contains (list, bookmark2));
 
     /* Check insertion */
-    nautilus_bookmark_list_add (list, bookmark1, -1);
-    g_assert_true (nautilus_bookmark_list_contains (list, bookmark1));
+    ammonite_bookmark_list_add (list, bookmark1, -1);
+    g_assert_true (ammonite_bookmark_list_contains (list, bookmark1));
 
     /* Check location */
-    NautilusBookmark *bm = nautilus_bookmark_list_get_bookmark (list, bookmark1);
+    AmmoniteBookmark *bm = ammonite_bookmark_list_get_bookmark (list, bookmark1);
     g_assert_nonnull (bm);
-    g_assert_true (g_file_equal (nautilus_bookmark_get_location (bm), bookmark1));
+    g_assert_true (g_file_equal (ammonite_bookmark_get_location (bm), bookmark1));
 
     /* Check insertion position and list length */
-    nautilus_bookmark_list_add (list, bookmark2, 0);
-    g_assert_true (nautilus_bookmark_list_contains (list, bookmark2));
+    ammonite_bookmark_list_add (list, bookmark2, 0);
+    g_assert_true (ammonite_bookmark_list_contains (list, bookmark2));
 
-    GList *bookmark_list = nautilus_bookmark_list_get_all (list);
+    GList *bookmark_list = ammonite_bookmark_list_get_all (list);
 
     g_assert_nonnull (bookmark_list);
     g_assert_cmpint (g_list_length (bookmark_list), ==, 2);
 
     /* Check order: bookmark2 at 0, bookmark1 at 1 */
-    NautilusBookmark *first = NAUTILUS_BOOKMARK (g_list_nth (bookmark_list, 0)->data);
-    NautilusBookmark *second = NAUTILUS_BOOKMARK (g_list_nth (bookmark_list, 1)->data);
+    AmmoniteBookmark *first = AMMONITE_BOOKMARK (g_list_nth (bookmark_list, 0)->data);
+    AmmoniteBookmark *second = AMMONITE_BOOKMARK (g_list_nth (bookmark_list, 1)->data);
 
-    g_assert_true (g_file_equal (nautilus_bookmark_get_location (first), bookmark2));
-    g_assert_true (g_file_equal (nautilus_bookmark_get_location (second), bookmark1));
+    g_assert_true (g_file_equal (ammonite_bookmark_get_location (first), bookmark2));
+    g_assert_true (g_file_equal (ammonite_bookmark_get_location (second), bookmark1));
 
     /* Check moving index */
-    nautilus_bookmark_list_move_item (list, bookmark1, 0);
+    ammonite_bookmark_list_move_item (list, bookmark1, 0);
 
-    bookmark_list = nautilus_bookmark_list_get_all (list);
+    bookmark_list = ammonite_bookmark_list_get_all (list);
     g_assert_cmpint (g_list_length (bookmark_list), ==, 2);
-    first = NAUTILUS_BOOKMARK (bookmark_list->data);
-    g_assert_true (g_file_equal (nautilus_bookmark_get_location (first), bookmark1));
+    first = AMMONITE_BOOKMARK (bookmark_list->data);
+    g_assert_true (g_file_equal (ammonite_bookmark_get_location (first), bookmark1));
 
     /* Check Removal */
-    nautilus_bookmark_list_remove (list, bookmark1);
-    g_assert_false (nautilus_bookmark_list_contains (list, bookmark1));
-    bookmark_list = nautilus_bookmark_list_get_all (list);
+    ammonite_bookmark_list_remove (list, bookmark1);
+    g_assert_false (ammonite_bookmark_list_contains (list, bookmark1));
+    bookmark_list = ammonite_bookmark_list_get_all (list);
     g_assert_cmpint (g_list_length (bookmark_list), ==, 1);
-    g_assert_true (g_file_equal (nautilus_bookmark_get_location (bookmark_list->data), bookmark2));
+    g_assert_true (g_file_equal (ammonite_bookmark_get_location (bookmark_list->data), bookmark2));
 
     test_clear_tmp_dir ();
 }
@@ -124,7 +124,7 @@ typedef struct
 } ChangedSignalTestData;
 
 static void
-bookmark_list_changed_cb (NautilusBookmarkList  *list,
+bookmark_list_changed_cb (AmmoniteBookmarkList  *list,
                           ChangedSignalTestData *data)
 {
     data->signal_count++;
@@ -155,18 +155,18 @@ test_bookmark_list_missing_file (void)
     const char *tmp_dir = test_get_tmp_dir ();
     g_autoptr (GFile) bookmarks_list_file =
         g_file_new_build_filename (tmp_dir, "gtk-3.0", "bookmarks", NULL);
-    g_autoptr (NautilusBookmarkList) list = NULL;
+    g_autoptr (AmmoniteBookmarkList) list = NULL;
     g_autoptr (GFile) bookmark = g_file_new_build_filename (tmp_dir, "bookmark", NULL);
     g_autofree char *bookmark_uri = g_file_get_uri (bookmark);
 
     g_setenv ("XDG_CONFIG_HOME", tmp_dir, TRUE);
-    list = nautilus_bookmark_list_new ();
-    nautilus_bookmark_list_add (list, bookmark, -1);
+    list = ammonite_bookmark_list_new ();
+    ammonite_bookmark_list_add (list, bookmark, -1);
 
     ITER_CONTEXT_WHILE (!g_file_query_exists (bookmarks_list_file, NULL));
     ITER_CONTEXT_WHILE (!file_has_string (bookmarks_list_file, bookmark_uri));
 
-    g_assert_true (nautilus_bookmark_list_contains (list, bookmark));
+    g_assert_true (ammonite_bookmark_list_contains (list, bookmark));
 
     test_clear_tmp_dir ();
 }
@@ -182,8 +182,8 @@ test_bookmark_list_first_load_merge (void)
     g_autofree char *new_uri = g_file_get_uri (new_location);
     g_autofree char *disk_contents = g_strdup_printf ("%s On disk\n", existing_uri);
     g_autoptr (GError) error = NULL;
-    g_autoptr (NautilusBookmarkList) list = NULL;
-    g_autoptr (NautilusBookmark) pending_duplicate = NULL;
+    g_autoptr (AmmoniteBookmarkList) list = NULL;
+    g_autoptr (AmmoniteBookmark) pending_duplicate = NULL;
     ChangedSignalTestData test_data = { 0, 0 };
 
     g_file_replace_contents (bookmarks_list_file,
@@ -191,31 +191,31 @@ test_bookmark_list_first_load_merge (void)
                              NULL, FALSE, G_FILE_CREATE_NONE, NULL, NULL, &error);
     g_assert_no_error (error);
 
-    list = nautilus_bookmark_list_new ();
+    list = ammonite_bookmark_list_new ();
     g_signal_connect (list, "changed", G_CALLBACK (bookmark_list_changed_cb), &test_data);
 
     test_data.expected_signal_count++;
-    nautilus_bookmark_list_add (list, existing_location, -1);
-    pending_duplicate = g_object_ref (nautilus_bookmark_list_get_bookmark (list, existing_location));
+    ammonite_bookmark_list_add (list, existing_location, -1);
+    pending_duplicate = g_object_ref (ammonite_bookmark_list_get_bookmark (list, existing_location));
 
     test_data.expected_signal_count++;
-    nautilus_bookmark_list_add (list, new_location, -1);
+    ammonite_bookmark_list_add (list, new_location, -1);
 
     test_data.expected_signal_count++;
     ITER_CONTEXT_WHILE (test_data.signal_count < test_data.expected_signal_count);
 
-    NautilusBookmark *loaded_duplicate = nautilus_bookmark_list_get_bookmark (list, existing_location);
-    NautilusBookmark *new_bookmark = nautilus_bookmark_list_get_bookmark (list, new_location);
+    AmmoniteBookmark *loaded_duplicate = ammonite_bookmark_list_get_bookmark (list, existing_location);
+    AmmoniteBookmark *new_bookmark = ammonite_bookmark_list_get_bookmark (list, new_location);
 
     g_assert_nonnull (loaded_duplicate);
     g_assert_true (loaded_duplicate != pending_duplicate);
     g_assert_nonnull (new_bookmark);
 
-    nautilus_bookmark_set_name (pending_duplicate, "No longer in list");
+    ammonite_bookmark_set_name (pending_duplicate, "No longer in list");
     g_assert_cmpuint (test_data.signal_count, ==, test_data.expected_signal_count);
 
     test_data.expected_signal_count++;
-    nautilus_bookmark_set_name (new_bookmark, "Renamed");
+    ammonite_bookmark_set_name (new_bookmark, "Renamed");
     g_assert_cmpuint (test_data.signal_count, ==, test_data.expected_signal_count);
 
     ITER_CONTEXT_WHILE (!file_has_string (bookmarks_list_file, "Renamed"));
@@ -231,7 +231,7 @@ test_bookmark_list_changed_signal_internal (void)
 {
     const char *tmp_dir = test_get_tmp_dir ();
     g_autoptr (GFile) bookmarks_list_file = setup_tmp_bookmarks_file (tmp_dir);
-    g_autoptr (NautilusBookmarkList) list = nautilus_bookmark_list_new ();
+    g_autoptr (AmmoniteBookmarkList) list = ammonite_bookmark_list_new ();
     g_autoptr (GFile) bookmark1 = g_file_new_build_filename (test_get_tmp_dir (),
                                                              "one",
                                                              NULL);
@@ -239,7 +239,7 @@ test_bookmark_list_changed_signal_internal (void)
                                                              "two",
                                                              NULL);
     ChangedSignalTestData test_data = { 0, 0 };
-    NautilusBookmark *existing_bookmark;
+    AmmoniteBookmark *existing_bookmark;
     const char *existing_bookmark_new_name = "New Name";
 
     g_assert_true (g_file_query_exists (bookmarks_list_file, NULL));
@@ -253,29 +253,29 @@ test_bookmark_list_changed_signal_internal (void)
 
     /* Test direct changes by modifying bookmarks */
     test_data.expected_signal_count++;
-    nautilus_bookmark_list_add (list, bookmark1, -1);
+    ammonite_bookmark_list_add (list, bookmark1, -1);
     g_assert_cmpint (test_data.signal_count, ==, test_data.expected_signal_count);
 
     test_data.expected_signal_count++;
-    nautilus_bookmark_list_add (list, bookmark2, -1);
+    ammonite_bookmark_list_add (list, bookmark2, -1);
     g_assert_cmpint (test_data.signal_count, ==, test_data.expected_signal_count);
 
     test_data.expected_signal_count++;
-    nautilus_bookmark_list_remove (list, bookmark2);
+    ammonite_bookmark_list_remove (list, bookmark2);
     g_assert_cmpint (test_data.signal_count, ==, test_data.expected_signal_count);
 
-    existing_bookmark = nautilus_bookmark_list_get_bookmark (list, bookmark1);
+    existing_bookmark = ammonite_bookmark_list_get_bookmark (list, bookmark1);
     g_assert_nonnull (existing_bookmark);
     test_data.expected_signal_count++;
-    nautilus_bookmark_set_name (existing_bookmark, existing_bookmark_new_name);
+    ammonite_bookmark_set_name (existing_bookmark, existing_bookmark_new_name);
     g_assert_cmpint (test_data.signal_count, ==, test_data.expected_signal_count);
 
     /* Wait for the list to be written to the file. */
     ITER_CONTEXT_WHILE (!file_has_string (bookmarks_list_file, existing_bookmark_new_name));
 
-    g_assert_nonnull (nautilus_bookmark_list_get_bookmark (list, bookmark1));
-    g_assert_null (nautilus_bookmark_list_get_bookmark (list, bookmark2));
-    g_assert_cmpstr (nautilus_bookmark_get_name (nautilus_bookmark_list_get_bookmark (list,
+    g_assert_nonnull (ammonite_bookmark_list_get_bookmark (list, bookmark1));
+    g_assert_null (ammonite_bookmark_list_get_bookmark (list, bookmark2));
+    g_assert_cmpstr (ammonite_bookmark_get_name (ammonite_bookmark_list_get_bookmark (list,
                                                                                       bookmark1)),
                      ==,
                      existing_bookmark_new_name);
@@ -291,7 +291,7 @@ test_bookmark_list_changed_signal_external (void)
 {
     const char *tmp_dir = test_get_tmp_dir ();
     g_autoptr (GFile) bookmarks_list_file = setup_tmp_bookmarks_file (tmp_dir);
-    g_autoptr (NautilusBookmarkList) list = NULL;
+    g_autoptr (AmmoniteBookmarkList) list = NULL;
     ChangedSignalTestData test_data = { 0, 0 };
     g_autoptr (GFile) tmp_bookmark = g_file_new_build_filename (tmp_dir, "file1", NULL);
     g_autoptr (GFile) external_bookmark = g_file_new_build_filename (tmp_dir, "external", NULL);
@@ -314,7 +314,7 @@ test_bookmark_list_changed_signal_external (void)
                              &error);
     g_assert_no_error (error);
 
-    list = nautilus_bookmark_list_new ();
+    list = ammonite_bookmark_list_new ();
     g_signal_connect (list, "changed", G_CALLBACK (bookmark_list_changed_cb), &test_data);
 
     /* Wait for the list to be loaded */
@@ -335,11 +335,11 @@ test_bookmark_list_changed_signal_external (void)
     g_assert_no_error (error);
 
     /* Insure new bookmark exists and old bookmark is gone */
-    ITER_CONTEXT_WHILE (nautilus_bookmark_list_get_bookmark (list, external_bookmark) == NULL);
-    g_assert_cmpstr (nautilus_bookmark_get_name (nautilus_bookmark_list_get_bookmark (list, external_bookmark)),
+    ITER_CONTEXT_WHILE (ammonite_bookmark_list_get_bookmark (list, external_bookmark) == NULL);
+    g_assert_cmpstr (ammonite_bookmark_get_name (ammonite_bookmark_list_get_bookmark (list, external_bookmark)),
                      ==,
                      "External");
-    g_assert_null (nautilus_bookmark_list_get_bookmark (list, tmp_bookmark));
+    g_assert_null (ammonite_bookmark_list_get_bookmark (list, tmp_bookmark));
     ITER_CONTEXT_WHILE (test_data.signal_count < test_data.expected_signal_count);
     g_assert_cmpint (test_data.signal_count, ==, test_data.expected_signal_count);
 
@@ -355,7 +355,7 @@ main (int   argc,
 {
     g_test_init (&argc, &argv, NULL);
 
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/bookmarks/basic",
                      test_bookmark);

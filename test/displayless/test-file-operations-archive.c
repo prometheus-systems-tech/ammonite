@@ -7,11 +7,11 @@
  */
 
 #include "test-utilities.h"
-#include <src/nautilus-file-operations.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-file-utilities.h>
-#include <src/nautilus-progress-info.h>
-#include <src/nautilus-progress-info-manager.h>
+#include <src/ammonite-file-operations.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-file-utilities.h>
+#include <src/ammonite-progress-info.h>
+#include <src/ammonite-progress-info-manager.h>
 
 #include <gnome-autoar/gnome-autoar.h>
 
@@ -158,7 +158,7 @@ file_hierarchy_create_compress (const GStrv   hier,
 
     file_hierarchy_create (hier, "");
 
-    nautilus_file_operations_compress (compressed_files,
+    ammonite_file_operations_compress (compressed_files,
                                        output_file,
                                        format,
                                        filter,
@@ -239,7 +239,7 @@ test_archive_file (void)
     file_hierarchy_delete (compressed_files_hier, "");
     file_hierarchy_assert_exists (compressed_files_hier, "", FALSE);
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -285,7 +285,7 @@ test_archive_file_long (void)
     /*
      * Compression
      */
-    nautilus_file_operations_compress (&(GList){ .data = big_file },
+    ammonite_file_operations_compress (&(GList){ .data = big_file },
                                        archive_file,
                                        format,
                                        filter,
@@ -330,7 +330,7 @@ test_archive_file_long (void)
     g_assert_no_error (error);
     g_assert_false (g_file_query_exists (big_file, NULL));
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -373,7 +373,7 @@ test_compress_file_password (void)
     /*
      * Compression
      */
-    nautilus_file_operations_compress (&(GList){ .data = compressed_file },
+    ammonite_file_operations_compress (&(GList){ .data = compressed_file },
                                        archive_file,
                                        format,
                                        filter,
@@ -427,14 +427,14 @@ test_compress_error (const GStrv compressed_files_hier)
     file_hierarchy_create (compressed_files_hier, "");
 
     /* Clear to check for extract operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
     /* An existing directory at the archive path makes autoar fail to create the
      * output file, which triggers compress_job_on_error(). */
     g_file_make_directory (archive_file, NULL, NULL);
     g_assert_true (g_file_query_exists (archive_file, NULL));
 
-    nautilus_file_operations_compress (compressed_files,
+    ammonite_file_operations_compress (compressed_files,
                                        archive_file,
                                        AUTOAR_FORMAT_ZIP,
                                        AUTOAR_FILTER_NONE,
@@ -450,9 +450,9 @@ test_compress_error (const GStrv compressed_files_hier)
     /* The failed operation must leave both the sources and the output untouched. */
     file_hierarchy_assert_exists (compressed_files_hier, "", TRUE);
     g_assert_true (g_file_query_exists (archive_file, NULL));
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -478,9 +478,9 @@ test_extract_error (GStrv compressed_files_hier)
     g_assert_true (g_file_query_exists (bad_destination, NULL));
 
     /* Clear to check for extract operation undo status. */
-    nautilus_file_undo_manager_set_action (NULL);
+    ammonite_file_undo_manager_set_action (NULL);
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             bad_destination,
                                             NULL,
                                             NULL,
@@ -491,9 +491,9 @@ test_extract_error (GStrv compressed_files_hier)
     g_assert_false (data->success);
     file_hierarchy_assert_exists (compressed_files_hier, "", TRUE);
     g_assert_true (g_file_query_exists (archive_file, NULL));
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -570,7 +570,7 @@ test_archive_full_dir (void)
     file_hierarchy_delete (compressed_files_hier, "");
     file_hierarchy_assert_exists (compressed_files_hier, "", FALSE);
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -626,7 +626,7 @@ test_archive_full_dir_cancel (void)
 
     file_hierarchy_create (compressed_files_hier, "");
 
-    nautilus_file_operations_compress (compressed_files,
+    ammonite_file_operations_compress (compressed_files,
                                        archive_file,
                                        format,
                                        filter,
@@ -645,7 +645,7 @@ test_archive_full_dir_cancel (void)
     g_file_delete (archive_file, NULL, NULL);
 
     compress_data->files = (&(GList){ .data = archive_file, });
-    nautilus_file_operations_compress (compressed_files,
+    ammonite_file_operations_compress (compressed_files,
                                        archive_file,
                                        format,
                                        filter,
@@ -668,7 +668,7 @@ test_archive_full_dir_cancel (void)
     file_hierarchy_delete (compressed_files_hier, "");
     file_hierarchy_assert_exists (compressed_files_hier, "", FALSE);
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -743,7 +743,7 @@ test_archive_files (void)
     file_hierarchy_delete (compressed_files_hier, "");
     file_hierarchy_assert_exists (compressed_files_hier, "", FALSE);
 
-    nautilus_file_operations_extract_files (&(GList){ .data = archive_file },
+    ammonite_file_operations_extract_files (&(GList){ .data = archive_file },
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -857,7 +857,7 @@ test_archives_files (void)
     file_hierarchy_delete (second_compressed_hier, "");
     file_hierarchy_assert_exists (second_compressed_hier, "", FALSE);
 
-    nautilus_file_operations_extract_files (archives_to_extract,
+    ammonite_file_operations_extract_files (archives_to_extract,
                                             tmp_dir,
                                             NULL,
                                             NULL,
@@ -889,15 +889,15 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusProgressInfoManager) progress_manager = NULL;
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteProgressInfoManager) progress_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
 
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
-    progress_manager = nautilus_progress_info_manager_dup_singleton ();
-    undo_manager = nautilus_file_undo_manager_new ();
+    progress_manager = ammonite_progress_info_manager_dup_singleton ();
+    undo_manager = ammonite_file_undo_manager_new ();
 
     g_test_add_func ("/single_file/short",
                      test_archive_file);

@@ -1,5 +1,5 @@
 tests = {
-  'test-nautilus-directory-async': {},
+  'test-ammonite-directory-async': {},
   'test-file-operations-create': {},
   'test-files-view': {
     'is_parallel': false,
@@ -22,7 +22,7 @@ foreach test_name, extra_args : tests
   test_exe = executable(
     test_name,
     source,
-    dependencies: [libnautilus_dep, libtestutils_dep],
+    dependencies: [libammonite_dep, libtestutils_dep],
   )
   args = []
   exe = []

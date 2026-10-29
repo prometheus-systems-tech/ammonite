@@ -3,15 +3,15 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Tests for nautilus_file_operations_rename ()
+ * Tests for ammonite_file_operations_rename ()
  */
 
 #include <glib.h>
 
-#include <nautilus-file-operations.h>
-#include <nautilus-file-undo-manager.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-tag-manager.h>
+#include <ammonite-file-operations.h>
+#include <ammonite-file-undo-manager.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-tag-manager.h>
 
 #include <test-utilities.h>
 
@@ -59,7 +59,7 @@ test_rename_basic (void)
     g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, &error);
     g_assert_no_error (error);
 
-    nautilus_file_operations_rename (file, "renamed.txt", NULL, NULL,
+    ammonite_file_operations_rename (file, "renamed.txt", NULL, NULL,
                                      rename_done_callback, &callback_data);
 
     ITER_CONTEXT_WHILE (!callback_data.called);
@@ -97,8 +97,8 @@ test_rename_to_self (void)
     g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, &error);
     g_assert_no_error (error);
 
-    nautilus_file_undo_manager_set_action (NULL);
-    nautilus_file_operations_rename (file, "original.txt", NULL, NULL,
+    ammonite_file_undo_manager_set_action (NULL);
+    ammonite_file_operations_rename (file, "original.txt", NULL, NULL,
                                      rename_done_callback, &callback_data);
 
     ITER_CONTEXT_WHILE (!callback_data.called);
@@ -107,9 +107,9 @@ test_rename_to_self (void)
     g_assert_nonnull (callback_data.renamed_file);
     g_assert_true (g_file_query_exists (file, NULL));
     g_assert_true (g_file_equal (callback_data.renamed_file, file));
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
     test_clear_tmp_dir ();
 }
@@ -129,17 +129,17 @@ test_rename_with_separator (void)
     g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, &error);
     g_assert_no_error (error);
 
-    nautilus_file_undo_manager_set_action (NULL);
-    nautilus_file_operations_rename (file, invalid_name, NULL, NULL,
+    ammonite_file_undo_manager_set_action (NULL);
+    ammonite_file_operations_rename (file, invalid_name, NULL, NULL,
                                      rename_done_callback, &callback_data);
 
     ITER_CONTEXT_WHILE (!callback_data.called);
 
     g_assert_false (callback_data.success);
     g_assert_true (g_file_query_exists (file, NULL));
-    g_assert_cmpuint (nautilus_file_undo_manager_get_state (),
+    g_assert_cmpuint (ammonite_file_undo_manager_get_state (),
                       ==,
-                      NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
+                      AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
 
 
     test_clear_tmp_dir ();
@@ -149,15 +149,15 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
 
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
-    undo_manager = nautilus_file_undo_manager_new ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    undo_manager = ammonite_file_undo_manager_new ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
 
     g_test_add_func ("/single/basic",
                      test_rename_basic);

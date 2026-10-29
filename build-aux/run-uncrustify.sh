@@ -33,7 +33,7 @@ format_file()
     rm -f "$TMP_FILE" "$ALIGNED_FILE"
 }
 
-for DIR in "$BUILD_AUX/../"{src,test,libnautilus-extension,extensions}
+for DIR in "$BUILD_AUX/../"{src,test,libammonite-extension,extensions}
 do
     for FILE in $(find "$DIR" -name "*.c")
     do

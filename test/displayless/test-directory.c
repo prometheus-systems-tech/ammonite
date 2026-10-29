@@ -2,9 +2,9 @@
 
 #include <glib.h>
 
-#include <nautilus-directory.h>
-#include <nautilus-directory-private.h>
-#include <nautilus-file-utilities.h>
+#include <ammonite-directory.h>
+#include <ammonite-directory-private.h>
+#include <ammonite-file-utilities.h>
 
 
 static int data_dummy;
@@ -63,45 +63,45 @@ callback_counter_await (CallbackCounter *data)
 static void
 test_directory_duplicate_pointers (void)
 {
-    g_autoptr (NautilusDirectory) directory = nautilus_directory_get_by_uri ("file:///etc");
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri ("file:///etc/passwd");
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_get_by_uri ("file:///etc");
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri ("file:///etc/passwd");
 
-    /* Assert that the NautilusFile reuses the existing NautilusDirectory instance.. */
-    g_assert_cmpuint (nautilus_directory_number_outstanding (), ==, 1);
+    /* Assert that the AmmoniteFile reuses the existing AmmoniteDirectory instance.. */
+    g_assert_cmpuint (ammonite_directory_number_outstanding (), ==, 1);
 
-    g_assert_true (nautilus_directory_get_by_uri ("file:///etc") == directory);
-    nautilus_directory_unref (directory);
+    g_assert_true (ammonite_directory_get_by_uri ("file:///etc") == directory);
+    ammonite_directory_unref (directory);
 
-    g_assert_true (nautilus_directory_get_by_uri ("file:///etc/") == directory);
-    nautilus_directory_unref (directory);
+    g_assert_true (ammonite_directory_get_by_uri ("file:///etc/") == directory);
+    ammonite_directory_unref (directory);
 
-    g_assert_true (nautilus_directory_get_by_uri ("file:///etc////") == directory);
-    nautilus_directory_unref (directory);
+    g_assert_true (ammonite_directory_get_by_uri ("file:///etc////") == directory);
+    ammonite_directory_unref (directory);
 }
 
 /** Check that directory hash table gets cleaned up */
 static void
 test_directory_hash_table_cleanup (void)
 {
-    NautilusDirectory *directory = nautilus_directory_get_by_uri ("file:///etc");
+    AmmoniteDirectory *directory = ammonite_directory_get_by_uri ("file:///etc");
 
-    g_assert_cmpuint (nautilus_directory_number_outstanding (), ==, 1);
+    g_assert_cmpuint (ammonite_directory_number_outstanding (), ==, 1);
 
-    nautilus_directory_file_monitor_add (directory, &data_dummy, TRUE, 0, NULL, NULL);
+    ammonite_directory_file_monitor_add (directory, &data_dummy, TRUE, 0, NULL, NULL);
 
     /* For normal usage there would be activity here, however, it is not needed for testing. */
 
-    nautilus_directory_file_monitor_remove (directory, &data_dummy);
-    nautilus_directory_unref (directory);
+    ammonite_directory_file_monitor_remove (directory, &data_dummy);
+    ammonite_directory_unref (directory);
 
-    ITER_CONTEXT_WHILE (nautilus_directory_number_outstanding () > 0);
+    ITER_CONTEXT_WHILE (ammonite_directory_number_outstanding () > 0);
 
-    g_assert_cmpuint (nautilus_directory_number_outstanding (), ==, 0);
+    g_assert_cmpuint (ammonite_directory_number_outstanding (), ==, 0);
 }
 
 static void
-callback_counter_directory_callback (NautilusDirectory *directory,
-                                     NautilusFileList  *files,
+callback_counter_directory_callback (AmmoniteDirectory *directory,
+                                     AmmoniteFileList  *files,
                                      gpointer           user_data)
 {
     callback_counter_callback (user_data);
@@ -111,21 +111,21 @@ callback_counter_directory_callback (NautilusDirectory *directory,
 static void
 test_directory_call_when_ready (void)
 {
-    g_autoptr (NautilusDirectory) directory = nautilus_directory_get_by_uri ("file:///etc");
+    g_autoptr (AmmoniteDirectory) directory = ammonite_directory_get_by_uri ("file:///etc");
     g_autoptr (CallbackCounter) data = callback_counter_new (1);
 
-    g_assert_cmpuint (nautilus_directory_number_outstanding (), ==, 1);
+    g_assert_cmpuint (ammonite_directory_number_outstanding (), ==, 1);
 
-    nautilus_directory_call_when_ready (directory,
-                                        NAUTILUS_ATTRIBUTE_INFO |
-                                        NAUTILUS_ATTRIBUTE_DEEP_COUNT |
-                                        NAUTILUS_ATTRIBUTE_FILE_LIST,
+    ammonite_directory_call_when_ready (directory,
+                                        AMMONITE_ATTRIBUTE_INFO |
+                                        AMMONITE_ATTRIBUTE_DEEP_COUNT |
+                                        AMMONITE_ATTRIBUTE_FILE_LIST,
                                         callback_counter_directory_callback, data);
 
     callback_counter_await (data);
 
-    /* Every NautilusFile created by call_when_ready must have been
-     * unref'd and destroyed after the NautilusDirectoryCallback returns */
+    /* Every AmmoniteFile created by call_when_ready must have been
+     * unref'd and destroyed after the AmmoniteDirectoryCallback returns */
     g_assert_null (directory->details->file_list);
 }
 
@@ -135,7 +135,7 @@ main (int   argc,
 {
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/directory-duplicate-pointers/1.0",
                      test_directory_duplicate_pointers);

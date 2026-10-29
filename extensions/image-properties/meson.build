@@ -1,13 +1,13 @@
 shared_module(
-  'nautilus-image-properties',
+  'ammonite-image-properties',
   [
-    'nautilus-image-properties-module.c',
-    'nautilus-image-properties-model.c',
-    'nautilus-image-properties-model.h',
-    'nautilus-image-properties-model-provider.c',
-    'nautilus-image-properties-model-provider.h',
+    'ammonite-image-properties-module.c',
+    'ammonite-image-properties-model.c',
+    'ammonite-image-properties-model.h',
+    'ammonite-image-properties-model-provider.c',
+    'ammonite-image-properties-model-provider.h',
   ],
-  dependencies: [gexiv, glycin, nautilus_extension],
+  dependencies: [gexiv, glycin, ammonite_extension],
   install: true,
   install_dir: extensiondir,
 )

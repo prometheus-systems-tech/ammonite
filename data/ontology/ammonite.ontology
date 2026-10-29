@@ -1,0 +1,20 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix nrl: <http://tracker.api.gnome.org/ontology/v3/nrl#> .
+@prefix ammonite: <https://ammonite.invalid/ns#> .
+
+ammonite: a nrl:Namespace, nrl:Ontology ;
+    nrl:prefix "ammonite" ;
+    nrl:lastModified "2020-05-01T10:00:00Z" .
+
+ammonite:File a rdfs:Class ;
+    rdfs:comment "Represents a file on disk by its URL. Equivalent to http://tracker.api.gnome.org/ontology/v3/nfo#FileDataObject" ;
+    rdfs:subClassOf rdfs:Resource ;
+    nrl:notify true .
+
+ammonite:starred a rdf:Property ;
+    rdfs:comment "Marks files that are starred in Ammonite." ;
+    rdfs:domain ammonite:File ;
+    rdfs:range xsd:boolean ;
+    nrl:maxCardinality 1 .

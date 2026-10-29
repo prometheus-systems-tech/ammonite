@@ -8,16 +8,16 @@
 
 #define G_LOG_DOMAIN "test-image"
 
-#include <nautilus-application.h>
-#include <nautilus-global-preferences.h>
-#include <nautilus-image.h>
-#include <nautilus-resources.h>
-#include <nautilus-thumbnails.h>
+#include <ammonite-application.h>
+#include <ammonite-global-preferences.h>
+#include <ammonite-image.h>
+#include <ammonite-resources.h>
+#include <ammonite-thumbnails.h>
 #include <test-utilities.h>
 
 #include <gtk/gtk.h>
 
-#define DEFAULT_SIZE NAUTILUS_GRID_ICON_SIZE_SMALL
+#define DEFAULT_SIZE AMMONITE_GRID_ICON_SIZE_SMALL
 
 static void
 increment (guint *value)
@@ -25,10 +25,10 @@ increment (guint *value)
     (*value)++;
 }
 
-static NautilusImage *
+static AmmoniteImage *
 build_window_with_image (GtkWindow **window_out)
 {
-    NautilusImage *image = nautilus_image_new ();
+    AmmoniteImage *image = ammonite_image_new ();
     GtkWindow *window = GTK_WINDOW (gtk_window_new ());
 
     gtk_widget_set_halign (GTK_WIDGET (image), GTK_ALIGN_START);
@@ -46,15 +46,15 @@ static void
 test_image_basic (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
 
     g_assert_nonnull (image);
     g_assert_true (GTK_IS_WIDGET (image));
     g_assert_true (gtk_widget_get_mapped (GTK_WIDGET (image)));
 
-    g_assert_null (nautilus_image_get_source (image));
-    g_assert_cmpint (nautilus_image_get_size (image), ==, DEFAULT_SIZE);
-    g_assert_null (nautilus_image_get_fallback (image));
+    g_assert_null (ammonite_image_get_source (image));
+    g_assert_cmpint (ammonite_image_get_size (image), ==, DEFAULT_SIZE);
+    g_assert_null (ammonite_image_get_fallback (image));
 
     gtk_window_close (window);
 }
@@ -62,12 +62,12 @@ test_image_basic (void)
 static void
 test_image_size_empty (void)
 {
-    g_autoptr (NautilusImage) image = g_object_ref_sink (nautilus_image_new ());
-    int size = NAUTILUS_GRID_ICON_SIZE_LARGE;
+    g_autoptr (AmmoniteImage) image = g_object_ref_sink (ammonite_image_new ());
+    int size = AMMONITE_GRID_ICON_SIZE_LARGE;
     int minimum, natural;
 
-    nautilus_image_set_size (image, size);
-    g_assert_cmpint (nautilus_image_get_size (image), ==, size);
+    ammonite_image_set_size (image, size);
+    g_assert_cmpint (ammonite_image_get_size (image), ==, size);
 
     gtk_widget_measure (GTK_WIDGET (image),
                         GTK_ORIENTATION_HORIZONTAL, -1,
@@ -85,24 +85,24 @@ static void
 test_image_source_dir (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
     g_autoptr (GFile) source = g_file_new_for_path (test_get_tmp_dir ());
     g_autoptr (GFile) duplicate_source = g_file_dup (source);
     guint changed_counter = 0;
 
     g_signal_connect_swapped (image, "notify::source", G_CALLBACK (increment), &changed_counter);
 
-    nautilus_image_set_source (image, source);
+    ammonite_image_set_source (image, source);
     g_assert_cmpint (changed_counter, ==, 1);
-    nautilus_image_set_source (image, source);
+    ammonite_image_set_source (image, source);
     g_assert_cmpint (changed_counter, ==, 1);
-    nautilus_image_set_source (image, duplicate_source);
+    ammonite_image_set_source (image, duplicate_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    g_assert_true (g_file_equal (duplicate_source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (duplicate_source, ammonite_image_get_source (image)));
 
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
     g_assert_cmpint (changed_counter, ==, 1);
 
     /* Wait for widget snapshot */
@@ -110,20 +110,20 @@ test_image_source_dir (void)
     g_assert_cmpint (gtk_widget_get_width (GTK_WIDGET (image)), ==, DEFAULT_SIZE);
     g_assert_cmpint (gtk_widget_get_height (GTK_WIDGET (image)), ==, DEFAULT_SIZE);
 
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    g_assert_null (nautilus_image_get_source (image));
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_null (ammonite_image_get_source (image));
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
 
     /* Try setting the same source again for a cache hit */
-    nautilus_image_set_source (image, source);
+    ammonite_image_set_source (image, source);
     g_assert_cmpint (changed_counter, ==, 3);
-    g_assert_true (g_file_equal (source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (source, ammonite_image_get_source (image)));
 
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
     g_assert_cmpint (changed_counter, ==, 3);
 
     gtk_window_close (window);
@@ -134,7 +134,7 @@ static void
 test_image_source_image_thumbnailed (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
     g_autoptr (GFile) image_source = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 "Image.png",
                                                                 NULL);
@@ -145,20 +145,20 @@ test_image_source_image_thumbnailed (void)
 
     /* Create a thumbnail beforehand */
     make_image_file_full (image_source, color, size, size, mtime, TRUE);
-    nautilus_image_set_size (image, size);
+    ammonite_image_set_size (image, size);
     g_signal_connect_swapped (image, "notify::source", G_CALLBACK (increment), &changed_counter);
 
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    g_assert_true (g_file_equal (image_source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (image_source, ammonite_image_get_source (image)));
 
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_THUMBNAIL);
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_THUMBNAIL);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_THUMBNAIL);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_THUMBNAIL);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_THUMBNAIL);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_THUMBNAIL);
     g_assert_cmpint (changed_counter, ==, 1);
 
     /* Wait for widget snapshot */
@@ -166,20 +166,20 @@ test_image_source_image_thumbnailed (void)
     g_assert_cmpint (gtk_widget_get_width (GTK_WIDGET (image)), ==, size);
     g_assert_cmpint (gtk_widget_get_height (GTK_WIDGET (image)), ==, size);
 
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    g_assert_null (nautilus_image_get_source (image));
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_null (ammonite_image_get_source (image));
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
 
     /* Try setting the same source again for a cache hit */
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 3);
-    g_assert_true (g_file_equal (image_source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (image_source, ammonite_image_get_source (image)));
 
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_THUMBNAIL);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_THUMBNAIL);
     g_assert_cmpint (changed_counter, ==, 3);
 
     gtk_window_close (window);
@@ -190,7 +190,7 @@ static void
 test_image_source_image_thumbnail (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
     g_autoptr (GFile) image_source = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 "Image.png",
                                                                 NULL);
@@ -200,20 +200,20 @@ test_image_source_image_thumbnail (void)
     guint changed_counter = 0;
 
     make_image_file_full (image_source, color, size, size, mtime, FALSE);
-    nautilus_image_set_size (image, size);
+    ammonite_image_set_size (image, size);
     g_signal_connect_swapped (image, "notify::source", G_CALLBACK (increment), &changed_counter);
 
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    g_assert_true (g_file_equal (image_source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (image_source, ammonite_image_get_source (image)));
 
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_ATTRIBUTES);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_THUMBNAIL);
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_LOADING_THUMBNAIL);
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_THUMBNAIL);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_ATTRIBUTES);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_THUMBNAIL);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_LOADING_THUMBNAIL);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_THUMBNAIL);
     g_assert_cmpint (changed_counter, ==, 1);
 
     /* Wait for widget snapshot */
@@ -221,12 +221,12 @@ test_image_source_image_thumbnail (void)
     g_assert_cmpint (gtk_widget_get_width (GTK_WIDGET (image)), ==, size);
     g_assert_cmpint (gtk_widget_get_height (GTK_WIDGET (image)), ==, size);
 
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    g_assert_null (nautilus_image_get_source (image));
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_null (ammonite_image_get_source (image));
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
 
     gtk_window_close (window);
     test_clear_tmp_dir ();
@@ -236,7 +236,7 @@ static void
 test_image_source_image_large (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
     g_autoptr (GFile) image_source = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 "Large.png",
                                                                 NULL);
@@ -246,24 +246,24 @@ test_image_source_image_large (void)
     guint changed_counter = 0;
 
     make_image_file_full (image_source, color, size, size, mtime, FALSE);
-    nautilus_image_set_size (image, DEFAULT_SIZE);
+    ammonite_image_set_size (image, DEFAULT_SIZE);
     g_signal_connect_swapped (image, "notify::source", G_CALLBACK (increment), &changed_counter);
 
-    nautilus_image_set_source (image, image_source);
+    ammonite_image_set_source (image, image_source);
     g_assert_cmpint (changed_counter, ==, 1);
-    g_assert_true (g_file_equal (image_source, nautilus_image_get_source (image)));
+    g_assert_true (g_file_equal (image_source, ammonite_image_get_source (image)));
 
-    ITER_CONTEXT_WHILE (nautilus_image_get_status (image) != NAUTILUS_IMAGE_STATUS_THUMBNAIL);
+    ITER_CONTEXT_WHILE (ammonite_image_get_status (image) != AMMONITE_IMAGE_STATUS_THUMBNAIL);
 
     /* Wait for widget snapshot */
     gtk_test_widget_wait_for_draw (GTK_WIDGET (image));
     g_assert_cmpint (gtk_widget_get_width (GTK_WIDGET (image)), ==, DEFAULT_SIZE);
     g_assert_cmpint (gtk_widget_get_height (GTK_WIDGET (image)), ==, DEFAULT_SIZE);
 
-    nautilus_image_set_source (image, NULL);
+    ammonite_image_set_source (image, NULL);
     g_assert_cmpint (changed_counter, ==, 2);
-    g_assert_null (nautilus_image_get_source (image));
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_null (ammonite_image_get_source (image));
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
 
     gtk_window_close (window);
     test_clear_tmp_dir ();
@@ -273,7 +273,7 @@ static void
 test_image_fallback (void)
 {
     GtkWindow *window;
-    NautilusImage *image = build_window_with_image (&window);
+    AmmoniteImage *image = build_window_with_image (&window);
     GtkIconTheme *icon_theme = gtk_icon_theme_get_for_display (gdk_display_get_default ());
     g_autoptr (GIcon) icon = g_themed_icon_new ("image-missing");
     g_autoptr (GIcon) dir_icon = g_themed_icon_new ("inode-directory");
@@ -288,13 +288,13 @@ test_image_fallback (void)
 
     g_signal_connect_swapped (image, "notify::fallback", G_CALLBACK (increment), &changed_counter);
 
-    nautilus_image_set_fallback (image, GDK_PAINTABLE (paintable));
+    ammonite_image_set_fallback (image, GDK_PAINTABLE (paintable));
     g_assert_cmpint (changed_counter, ==, 1);
-    nautilus_image_set_fallback (image, GDK_PAINTABLE (paintable));
+    ammonite_image_set_fallback (image, GDK_PAINTABLE (paintable));
     g_assert_cmpint (changed_counter, ==, 1);
-    fallback = nautilus_image_get_fallback (image);
+    fallback = ammonite_image_get_fallback (image);
     g_assert_true (fallback == GDK_PAINTABLE (paintable));
-    g_assert_true (nautilus_image_get_status (image) == NAUTILUS_IMAGE_STATUS_FALLBACK);
+    g_assert_true (ammonite_image_get_status (image) == AMMONITE_IMAGE_STATUS_FALLBACK);
 
     /* Wait for widget snapshot */
     gtk_test_widget_wait_for_draw (GTK_WIDGET (image));
@@ -308,10 +308,10 @@ test_image_fallback (void)
                                         GTK_TEXT_DIR_NONE,
                                         GTK_ICON_LOOKUP_PRELOAD);
 
-    nautilus_image_set_fallback (image, GDK_PAINTABLE (same_size_paintable));
+    ammonite_image_set_fallback (image, GDK_PAINTABLE (same_size_paintable));
     g_assert_cmpint (changed_counter, ==, 2);
     gtk_test_widget_wait_for_draw (GTK_WIDGET (image));
-    fallback = nautilus_image_get_fallback (image);
+    fallback = ammonite_image_get_fallback (image);
     g_assert_cmpint (gdk_paintable_get_intrinsic_height (fallback), ==, DEFAULT_SIZE);
     g_assert_cmpint (gdk_paintable_get_intrinsic_width (fallback), ==, DEFAULT_SIZE);
 
@@ -322,19 +322,19 @@ test_image_fallback (void)
                                         GTK_TEXT_DIR_NONE,
                                         GTK_ICON_LOOKUP_PRELOAD);
 
-    nautilus_image_set_fallback (image, GDK_PAINTABLE (different_size_paintable));
+    ammonite_image_set_fallback (image, GDK_PAINTABLE (different_size_paintable));
     g_assert_cmpint (changed_counter, ==, 3);
     gtk_test_widget_wait_for_draw (GTK_WIDGET (image));
-    fallback = nautilus_image_get_fallback (image);
+    fallback = ammonite_image_get_fallback (image);
     g_assert_cmpint (gdk_paintable_get_intrinsic_height (fallback), ==, different_size);
     g_assert_cmpint (gdk_paintable_get_intrinsic_width (fallback), ==, different_size);
 
-    nautilus_image_set_fallback (image, NULL);
+    ammonite_image_set_fallback (image, NULL);
     g_assert_cmpint (changed_counter, ==, 4);
-    g_assert_null (nautilus_image_get_fallback (image));
-    nautilus_image_set_fallback (image, NULL);
+    g_assert_null (ammonite_image_get_fallback (image));
+    ammonite_image_set_fallback (image, NULL);
     g_assert_cmpint (changed_counter, ==, 4);
-    g_assert_null (nautilus_image_get_fallback (image));
+    g_assert_null (ammonite_image_get_fallback (image));
 
     gtk_window_close (window);
 }
@@ -345,17 +345,17 @@ main (int   argc,
 {
     gtk_test_init (&argc, &argv, G_TEST_OPTION_ISOLATE_DIRS, NULL);
 
-    nautilus_register_resource ();
-    nautilus_global_preferences_init ();
+    ammonite_register_resource ();
+    ammonite_global_preferences_init ();
 
-    if (nautilus_application_is_sandboxed ())
+    if (ammonite_application_is_sandboxed ())
     {
         g_message ("Cannot run thumbnails tests inside a sandbox.");
 
         return 77;
     }
 
-    if (!nautilus_can_thumbnail ("file:///tmp/nautilus_tests/image.png", "image/png", 1))
+    if (!ammonite_can_thumbnail ("file:///tmp/ammonite_tests/image.png", "image/png", 1))
     {
         g_message ("System has no thumbnailer for PNGs, but tests are meant to test "
                    "thumbnailing images.");

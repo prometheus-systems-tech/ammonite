@@ -1,91 +1,91 @@
 #include <glib.h>
 
-#include <nautilus-directory-private.h>
-#include <nautilus-file.h>
-#include <nautilus-file-private.h>
-#include <nautilus-file-undo-manager.h>
-#include <nautilus-file-utilities.h>
+#include <ammonite-directory-private.h>
+#include <ammonite-file.h>
+#include <ammonite-file-private.h>
+#include <ammonite-file-undo-manager.h>
+#include <ammonite-file-utilities.h>
 #include <test-utilities.h>
 
 
 static void
 test_file_refcount_single_file (void)
 {
-    g_assert_cmpint (nautilus_directory_number_outstanding (), ==, 0);
+    g_assert_cmpint (ammonite_directory_number_outstanding (), ==, 0);
 
-    NautilusFile *file = nautilus_file_get_by_uri ("file:///home/");
+    AmmoniteFile *file = ammonite_file_get_by_uri ("file:///home/");
 
     g_assert_cmpint (G_OBJECT (file)->ref_count, ==, 1);
     g_assert_cmpint (G_OBJECT (file->details->directory)->ref_count, ==, 1);
-    g_assert_cmpint (nautilus_directory_number_outstanding (), ==, 1);
+    g_assert_cmpint (ammonite_directory_number_outstanding (), ==, 1);
 
-    nautilus_file_unref (file);
+    ammonite_file_unref (file);
 
-    g_assert_cmpint (nautilus_directory_number_outstanding (), ==, 0);
+    g_assert_cmpint (ammonite_directory_number_outstanding (), ==, 0);
 }
 
 static void
 test_file_check_name_bland (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri ("file:///home");
-    const char *name = nautilus_file_get_name (file);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri ("file:///home");
+    const char *name = ammonite_file_get_name (file);
     g_assert_cmpstr (name, ==, "home");
 }
 
 static void
 test_file_check_name_trailing_slash (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri ("file:///home/");
-    const char *name = nautilus_file_get_name (file);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri ("file:///home/");
+    const char *name = ammonite_file_get_name (file);
     g_assert_cmpstr (name, ==, "home");
 }
 
 static void
 test_file_duplicate_pointers (void)
 {
-    g_autoptr (NautilusFile) file = nautilus_file_get_by_uri ("file:///home/");
+    g_autoptr (AmmoniteFile) file = ammonite_file_get_by_uri ("file:///home/");
 
-    g_assert_true (nautilus_file_get_by_uri ("file:///home/") == file);
-    nautilus_file_unref (file);
+    g_assert_true (ammonite_file_get_by_uri ("file:///home/") == file);
+    ammonite_file_unref (file);
 
-    g_assert_true (nautilus_file_get_by_uri ("file:///home") == file);
-    nautilus_file_unref (file);
+    g_assert_true (ammonite_file_get_by_uri ("file:///home") == file);
+    ammonite_file_unref (file);
 }
 
 static void
 test_file_sort_order (void)
 {
-    g_autoptr (NautilusFile) file_1 = nautilus_file_get_by_uri ("file:///etc");
-    g_autoptr (NautilusFile) file_2 = nautilus_file_get_by_uri ("file:///usr");
-    NautilusFileSortType sort_type = NAUTILUS_FILE_SORT_BY_DISPLAY_NAME;
+    g_autoptr (AmmoniteFile) file_1 = ammonite_file_get_by_uri ("file:///etc");
+    g_autoptr (AmmoniteFile) file_2 = ammonite_file_get_by_uri ("file:///usr");
+    AmmoniteFileSortType sort_type = AMMONITE_FILE_SORT_BY_DISPLAY_NAME;
 
     g_assert_cmpint (G_OBJECT (file_1)->ref_count, ==, 1);
     g_assert_cmpint (G_OBJECT (file_2)->ref_count, ==, 1);
 
-    int order = nautilus_file_compare_for_sort (file_1, file_2, sort_type, FALSE, FALSE);
+    int order = ammonite_file_compare_for_sort (file_1, file_2, sort_type, FALSE, FALSE);
     g_assert_cmpint (order, <, 0);
 
-    int order_reversed = nautilus_file_compare_for_sort (file_1, file_2, sort_type, FALSE, TRUE);
+    int order_reversed = ammonite_file_compare_for_sort (file_1, file_2, sort_type, FALSE, TRUE);
     g_assert_cmpint (order_reversed, >, 0);
 }
 
 static void
 test_file_sort_with_self (void)
 {
-    g_autoptr (NautilusFile) file_1 = nautilus_file_get_by_uri ("file:///etc");
-    NautilusFileSortType sort_type = NAUTILUS_FILE_SORT_BY_DISPLAY_NAME;
+    g_autoptr (AmmoniteFile) file_1 = ammonite_file_get_by_uri ("file:///etc");
+    AmmoniteFileSortType sort_type = AMMONITE_FILE_SORT_BY_DISPLAY_NAME;
     int order;
 
-    order = nautilus_file_compare_for_sort (file_1, file_1, sort_type, TRUE, TRUE);
+    order = ammonite_file_compare_for_sort (file_1, file_1, sort_type, TRUE, TRUE);
     g_assert_cmpint (order, ==, 0);
 
-    order = nautilus_file_compare_for_sort (file_1, file_1, sort_type, TRUE, FALSE);
+    order = ammonite_file_compare_for_sort (file_1, file_1, sort_type, TRUE, FALSE);
     g_assert_cmpint (order, ==, 0);
 
-    order = nautilus_file_compare_for_sort (file_1, file_1, sort_type, FALSE, TRUE);
+    order = ammonite_file_compare_for_sort (file_1, file_1, sort_type, FALSE, TRUE);
     g_assert_cmpint (order, ==, 0);
 
-    order = nautilus_file_compare_for_sort (file_1, file_1, sort_type, FALSE, FALSE);
+    order = ammonite_file_compare_for_sort (file_1, file_1, sort_type, FALSE, FALSE);
     g_assert_cmpint (order, ==, 0);
 }
 
@@ -95,15 +95,15 @@ typedef struct
     GStrv expected_names;
     GStrv expected_content;
     gboolean *success;
-} NautilusFileBatchRenameTestData;
+} AmmoniteFileBatchRenameTestData;
 
 static void
-batch_rename_callback (NautilusFile *file,
+batch_rename_callback (AmmoniteFile *file,
                        GFile        *result_location,
                        GError       *error,
                        gpointer      callback_data)
 {
-    NautilusFileBatchRenameTestData *data = callback_data;
+    AmmoniteFileBatchRenameTestData *data = callback_data;
     g_autoptr (GStrvBuilder) name_builder = g_strv_builder_new ();
     g_autoptr (GStrvBuilder) content_builder = g_strv_builder_new ();
     g_auto (GStrv) result_names = NULL, result_content = NULL;
@@ -117,7 +117,7 @@ batch_rename_callback (NautilusFile *file,
         g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 data->expected_names[i],
                                                                 NULL);
-        g_autoptr (GFileInfo) info = g_file_query_info (location, NAUTILUS_FILE_DEFAULT_ATTRIBUTES,
+        g_autoptr (GFileInfo) info = g_file_query_info (location, AMMONITE_FILE_DEFAULT_ATTRIBUTES,
                                                         G_FILE_QUERY_INFO_NONE, NULL, NULL);
         g_autoptr (GFileInputStream) stream = g_file_read (location, NULL, NULL);
         gchar content[1024];
@@ -151,11 +151,11 @@ batch_rename_test (const GStrv hierarchy,
                    const GStrv original_names,
                    const GStrv expected_names)
 {
-    g_autolist (NautilusFile) files = NULL;
+    g_autolist (AmmoniteFile) files = NULL;
     g_autolist (GString) new_names = NULL;
     const gsize len = g_strv_length (expected_names);
     gboolean success = FALSE;
-    NautilusFileBatchRenameTestData data = { len, expected_names, original_names, &success };
+    AmmoniteFileBatchRenameTestData data = { len, expected_names, original_names, &success };
 
     file_hierarchy_create (hierarchy, "");
 
@@ -164,14 +164,14 @@ batch_rename_test (const GStrv hierarchy,
         g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 original_names[i],
                                                                 NULL);
-        NautilusFile *file = nautilus_file_get (location);
+        AmmoniteFile *file = ammonite_file_get (location);
         GString *new_name = g_string_new_take (g_path_get_basename (expected_names[i]));
 
         files = g_list_prepend (files, file);
         new_names = g_list_prepend (new_names, new_name);
     }
 
-    nautilus_file_batch_rename (files, new_names, batch_rename_callback, &data);
+    ammonite_file_batch_rename (files, new_names, batch_rename_callback, &data);
 
     g_assert_true (success);
 
@@ -203,8 +203,6 @@ test_file_batch_rename_cycles (void)
         {{"file_1", "file_2", "file_3", "file_4", "file_5", "file_6", "file_7", "file_8", NULL},
          {"file_8", "file_3", "file_4", "file_5", "file_6", "file_7", "file_2", "file_1", NULL}},
     };
-
-    g_test_bug ("https://gitlab.gnome.org/GNOME/nautilus/-/issues/1443");
 
     for (guint i = 0; i < G_N_ELEMENTS (test_cases); i++)
     {
@@ -297,29 +295,29 @@ test_file_permissions_can_set (void)
                                                 G_FILE_ATTRIBUTE_UNIX_MODE, mode,
                                                 G_FILE_QUERY_INFO_NONE, NULL, NULL));
 
-    g_autoptr (NautilusFile) file = nautilus_file_get (location);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
 
-    file_load_attributes (file, NAUTILUS_ATTRIBUTE_INFO);
-    g_assert_true (nautilus_file_can_set_permissions (file));
+    file_load_attributes (file, AMMONITE_ATTRIBUTE_INFO);
+    g_assert_true (ammonite_file_can_set_permissions (file));
 
     test_clear_tmp_dir ();
 }
 
 typedef struct
 {
-    NautilusFile *file;
+    AmmoniteFile *file;
     gboolean done;
 } PermissionTestData;
 
 static void
-file_changed_set_cb (NautilusFile *file,
+file_changed_set_cb (AmmoniteFile *file,
                      gboolean     *done)
 {
     *done = TRUE;
 }
 
 static void
-permissions_success_cb (NautilusFile *file,
+permissions_success_cb (AmmoniteFile *file,
                         GFile        *result_location,
                         GError       *error,
                         gpointer      user_data)
@@ -343,15 +341,15 @@ test_file_permissions_set_basic (void)
     g_assert_nonnull (stream);
     g_assert_true (g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, NULL));
 
-    g_autoptr (NautilusFile) file = nautilus_file_get (location);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
     PermissionTestData perm_data = { file, FALSE };
     gboolean file_changed = FALSE;
     guint32 perms = 0600;
 
-    file_load_attributes (file, NAUTILUS_ATTRIBUTE_INFO);
+    file_load_attributes (file, AMMONITE_ATTRIBUTE_INFO);
     g_signal_connect (file, "changed", G_CALLBACK (file_changed_set_cb), &file_changed);
 
-    nautilus_file_set_permissions (file, perms, permissions_success_cb, &perm_data);
+    ammonite_file_set_permissions (file, perms, permissions_success_cb, &perm_data);
     ITER_CONTEXT_WHILE (!perm_data.done);
 
     g_autoptr (GFileInfo) info = g_file_query_info (location, G_FILE_ATTRIBUTE_UNIX_MODE,
@@ -379,17 +377,17 @@ test_file_permissions_set_same (void)
     g_assert_nonnull (stream);
     g_assert_true (g_output_stream_close (G_OUTPUT_STREAM (stream), NULL, NULL));
 
-    g_autoptr (NautilusFile) file = nautilus_file_get (location);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
     gboolean file_changed = FALSE;
     g_autoptr (GFileInfo) info_before = g_file_query_info (location, G_FILE_ATTRIBUTE_UNIX_MODE,
                                                            G_FILE_QUERY_INFO_NONE, NULL, NULL);
     guint32 mode_before = g_file_info_get_attribute_uint32 (info_before, G_FILE_ATTRIBUTE_UNIX_MODE);
     PermissionTestData perm_data = { file, FALSE };
 
-    file_load_attributes (file, NAUTILUS_ATTRIBUTE_INFO);
+    file_load_attributes (file, AMMONITE_ATTRIBUTE_INFO);
     g_signal_connect (file, "changed", G_CALLBACK (file_changed_set_cb), &file_changed);
 
-    nautilus_file_set_permissions (file, mode_before, permissions_success_cb, &perm_data);
+    ammonite_file_set_permissions (file, mode_before, permissions_success_cb, &perm_data);
     ITER_CONTEXT_WHILE (!perm_data.done);
 
     g_autoptr (GFileInfo) info_after = g_file_query_info (location, G_FILE_ATTRIBUTE_UNIX_MODE,
@@ -422,23 +420,23 @@ test_directory_counts (void)
         NULL
     };
     g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (), "deepcount", NULL);
-    g_autoptr (NautilusFile) file = nautilus_file_get (location);
+    g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
     guint dir_count = 0, file_count = 0, unreadable = 0, item_count = 0;
-    NautilusRequestStatus status;
+    AmmoniteRequestStatus status;
     gboolean count_unreadable = TRUE;
 
     file_hierarchy_create (deep_hierarchy, "");
     file_load_attributes (file,
-                          NAUTILUS_ATTRIBUTE_INFO |
-                          NAUTILUS_ATTRIBUTE_DIRECTORY_ITEM_COUNT |
-                          NAUTILUS_ATTRIBUTE_DEEP_COUNT);
+                          AMMONITE_ATTRIBUTE_INFO |
+                          AMMONITE_ATTRIBUTE_DIRECTORY_ITEM_COUNT |
+                          AMMONITE_ATTRIBUTE_DEEP_COUNT);
 
-    g_assert_true (nautilus_file_get_directory_item_count (file, &item_count, &count_unreadable));
+    g_assert_true (ammonite_file_get_directory_item_count (file, &item_count, &count_unreadable));
     g_assert_cmpint (item_count, ==, 3);
     g_assert_false (count_unreadable);
 
-    status = nautilus_file_get_deep_counts (file, &dir_count, &file_count, &unreadable, NULL, TRUE);
-    g_assert_cmpint (status, ==, NAUTILUS_REQUEST_DONE);
+    status = ammonite_file_get_deep_counts (file, &dir_count, &file_count, &unreadable, NULL, TRUE);
+    g_assert_cmpint (status, ==, AMMONITE_REQUEST_DONE);
     g_assert_cmpint (dir_count, ==, 3);
     g_assert_cmpint (file_count, ==, 4);
     g_assert_cmpint (unreadable, ==, 0);
@@ -450,13 +448,13 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
 
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
-    undo_manager = nautilus_file_undo_manager_new ();
+    undo_manager = ammonite_file_undo_manager_new ();
 
     g_test_add_func ("/file-refcount/single-file",
                      test_file_refcount_single_file);

@@ -3,11 +3,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Tests for nautilus_file_operations_link ()
+ * Tests for ammonite_file_operations_link ()
  */
 
-#include <nautilus-file-undo-manager.h>
-#include <nautilus-file-operations.h>
+#include <ammonite-file-undo-manager.h>
+#include <ammonite-file-operations.h>
 
 #include "test-utilities.h"
 
@@ -87,7 +87,7 @@ run_link_testcases (LinkTestCase test_cases[],
 
         file_hierarchy_create (file_hierarchy, "");
 
-        nautilus_file_operations_link (file_list,
+        ammonite_file_operations_link (file_list,
                                        dest_dir,
                                        NULL,
                                        NULL,
@@ -284,11 +284,11 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
 
     g_test_init (&argc, &argv, NULL);
 
-    undo_manager = nautilus_file_undo_manager_new ();
+    undo_manager = ammonite_file_undo_manager_new ();
 
     g_test_add_func ("/link/files", test_link_files);
     g_test_add_func ("/link/directories", test_link_directories);

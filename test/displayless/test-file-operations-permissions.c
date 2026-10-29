@@ -3,15 +3,15 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * Tests for nautilus_file_set_permissions_recursive ()
+ * Tests for ammonite_file_set_permissions_recursive ()
  */
 
 #include "test-utilities.h"
 
-#include <src/nautilus-file-operations.h>
-#include <src/nautilus-file-undo-manager.h>
-#include <src/nautilus-file-utilities.h>
-#include <src/nautilus-tag-manager.h>
+#include <src/ammonite-file-operations.h>
+#include <src/ammonite-file-undo-manager.h>
+#include <src/ammonite-file-utilities.h>
+#include <src/ammonite-tag-manager.h>
 
 /* Only the standard POSIX permission bits are relevant for these tests. */
 #define PERMISSIONS_MASK 0777
@@ -115,7 +115,7 @@ run_set_permissions_recursive (GFile   *directory,
     g_autofree gchar *uri = g_file_get_uri (directory);
     PermissionsCallbackData callback_data = { 0 };
 
-    nautilus_file_set_permissions_recursive (uri,
+    ammonite_file_set_permissions_recursive (uri,
                                              file_permissions, file_mask,
                                              dir_permissions, dir_mask,
                                              permissions_done_callback,
@@ -217,14 +217,14 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusFileUndoManager) undo_manager = NULL;
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteFileUndoManager) undo_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
 
-    undo_manager = nautilus_file_undo_manager_new ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    undo_manager = ammonite_file_undo_manager_new ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
     g_test_init (&argc, &argv, NULL);
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/permissions/recursive/basic",
                      test_set_permissions_recursive);

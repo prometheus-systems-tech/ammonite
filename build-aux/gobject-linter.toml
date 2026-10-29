@@ -1,5 +1,5 @@
 ignore = [
-    "libnautilus-extension/**",
+    "libammonite-extension/**",
 ]
 
 [rules.property_switch_exhaustiveness]

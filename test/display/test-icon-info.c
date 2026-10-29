@@ -8,7 +8,7 @@
 
 #define G_LOG_DOMAIN "test-icon-info"
 
-#include <nautilus-icon-info.h>
+#include <ammonite-icon-info.h>
 
 #include <gtk/gtk.h>
 
@@ -40,7 +40,7 @@ test_themed_cache (void)
     {
         g_autoptr (GIcon) icon = g_themed_icon_new (test_cases[i].icon_name);
 
-        paintables[i] = nautilus_icon_info_lookup (icon, test_cases[i].size,
+        paintables[i] = ammonite_icon_info_lookup (icon, test_cases[i].size,
                                                    test_cases[i].scale);
         g_assert_nonnull (paintables[i]);
         g_assert_cmpint (gdk_paintable_get_intrinsic_width (paintables[i]),

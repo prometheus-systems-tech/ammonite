@@ -10,10 +10,10 @@
 
 #include <config.h>
 
-#include <nautilus-application.h>
-#include <nautilus-file-chooser.h>
-#include <nautilus-resources.h>
-#include <nautilus-tag-manager.h>
+#include <ammonite-application.h>
+#include <ammonite-file-chooser.h>
+#include <ammonite-resources.h>
+#include <ammonite-tag-manager.h>
 
 #include <test-utilities.h>
 
@@ -135,8 +135,8 @@ build_save_file_args (const char *parent_window,
     options = g_variant_builder_end (options_builder);
 
     return g_variant_new ("(osss@a{sv})",
-                          "/org/gnome/Nautilus/Devel",
-                          "org.gnome.Nautilus.Devel",
+                          "/org/ammonite/Ammonite/Devel",
+                          "org.ammonite.Ammonite.Devel",
                           parent_window,
                           title,
                           options);
@@ -162,7 +162,7 @@ static guint accept_source_id;
 static void
 trigger_accept_action (gpointer user_data)
 {
-    NautilusFileChooser *self = NAUTILUS_FILE_CHOOSER (user_data);
+    AmmoniteFileChooser *self = AMMONITE_FILE_CHOOSER (user_data);
 
     accept_source_id = 0;
 
@@ -176,7 +176,7 @@ static void
 file_chooser_window_shown_callback (GtkWidget *widget,
                                     gpointer   user_data)
 {
-    NautilusFileChooser *self = NAUTILUS_FILE_CHOOSER (widget);
+    AmmoniteFileChooser *self = AMMONITE_FILE_CHOOSER (widget);
 
     g_assert_true (gtk_widget_is_visible (GTK_WIDGET (self)));
     g_assert_true (gtk_widget_get_mapped (GTK_WIDGET (self)));
@@ -189,11 +189,11 @@ file_chooser_window_shown_callback (GtkWidget *widget,
 }
 
 static void
-window_added_callback (NautilusApplication *application,
-                       NautilusWindow      *window,
+window_added_callback (AmmoniteApplication *application,
+                       AmmoniteWindow      *window,
                        gpointer             user_data)
 {
-    NautilusFileChooser *file_chooser = NAUTILUS_FILE_CHOOSER (window);
+    AmmoniteFileChooser *file_chooser = AMMONITE_FILE_CHOOSER (window);
 
     g_signal_connect (file_chooser, "show", G_CALLBACK (file_chooser_window_shown_callback), NULL);
 }
@@ -330,7 +330,7 @@ main (int   argc,
     g_autoptr (GDBusConnection) connection = NULL;
     g_autoptr (GError) error = NULL;
 
-    if (nautilus_application_is_sandboxed ())
+    if (ammonite_application_is_sandboxed ())
     {
         /* TODO: Fix tracker-sandbox getting stuck when running this test,
          * which is required for flatpak. */
@@ -382,10 +382,10 @@ main (int   argc,
 
     g_test_init (&argc, &argv, NULL);
 
-    nautilus_register_resource ();
+    ammonite_register_resource ();
 
-    g_autoptr (NautilusTagManager) tag_manager = nautilus_tag_manager_new_dummy ();
-    g_autoptr (GApplication) app = G_APPLICATION (nautilus_application_new ());
+    g_autoptr (AmmoniteTagManager) tag_manager = ammonite_tag_manager_new_dummy ();
+    g_autoptr (GApplication) app = G_APPLICATION (ammonite_application_new ());
 
     g_application_hold (app);
     g_assert_true (g_application_register (app, NULL, NULL));

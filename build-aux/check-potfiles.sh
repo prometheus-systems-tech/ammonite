@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 menu_dirs="src/resources/menu"
-srcdirs="extensions src libnautilus-extension"
+srcdirs="extensions src libammonite-extension"
 desktopdirs="data"
 
 # Blueprint and C source files that contain gettext keywords

@@ -15,13 +15,13 @@ tests = {
   'test-file-utilities': {},
   'test-filename-common-prefix': {},
   'test-filename-utilities': {},
-  'test-nautilus-search-engine': {},
-  'test-nautilus-search-engine-localsearch': {
+  'test-ammonite-search-engine': {},
+  'test-ammonite-search-engine-localsearch': {
     'suite': ['tracker'],
     'tracker': true,
   },
-  'test-nautilus-search-engine-model': {},
-  'test-nautilus-search-engine-simple': {},
+  'test-ammonite-search-engine-model': {},
+  'test-ammonite-search-engine-simple': {},
   'test-scripts-monitor': {},
   'test-ui-utilities': {},
 }
@@ -32,7 +32,7 @@ foreach test_name, extra_args : tests
   test_exe = executable(
     test_name,
     source,
-    dependencies: [libnautilus_dep, libtestutils_dep],
+    dependencies: [libammonite_dep, libtestutils_dep],
   )
   args = []
   exe = []

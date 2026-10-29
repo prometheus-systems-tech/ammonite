@@ -7,21 +7,21 @@
 
 #include <test-utilities.h>
 
-#include <nautilus-application.h>
-#include <nautilus-enums.h>
-#include <nautilus-file.h>
-#include <nautilus-file-operations.h>
-#include <nautilus-file-undo-manager.h>
-#include <nautilus-file-utilities.h>
-#include <nautilus-files-view.h>
-#include <nautilus-global-preferences.h>
-#include <nautilus-list-base.h>
-#include <nautilus-resources.h>
-#include <nautilus-query.h>
-#include <nautilus-tag-manager.h>
-#include <nautilus-view-info.h>
-#include <nautilus-view-model.h>
-#include <nautilus-window-slot.h>
+#include <ammonite-application.h>
+#include <ammonite-enums.h>
+#include <ammonite-file.h>
+#include <ammonite-file-operations.h>
+#include <ammonite-file-undo-manager.h>
+#include <ammonite-file-utilities.h>
+#include <ammonite-files-view.h>
+#include <ammonite-global-preferences.h>
+#include <ammonite-list-base.h>
+#include <ammonite-resources.h>
+#include <ammonite-query.h>
+#include <ammonite-tag-manager.h>
+#include <ammonite-view-info.h>
+#include <ammonite-view-model.h>
+#include <ammonite-window-slot.h>
 
 #define G_LOG_DOMAIN "test-files-view"
 
@@ -72,31 +72,31 @@ set_true (gboolean *data)
 }
 
 static void
-collect_renamed_files (NautilusFile *file,
+collect_renamed_files (AmmoniteFile *file,
                        GFile        *result_location,
                        GError       *error,
                        gpointer      callback_data)
 {
     GPtrArray *renamed_files_arr = callback_data;
 
-    g_ptr_array_add (renamed_files_arr, nautilus_file_ref (file));
+    g_ptr_array_add (renamed_files_arr, ammonite_file_ref (file));
 }
 
 static void
-collect_changed_files (NautilusFilesView *view,
-                       NautilusFile      *file,
-                       NautilusDirectory *directory,
+collect_changed_files (AmmoniteFilesView *view,
+                       AmmoniteFile      *file,
+                       AmmoniteDirectory *directory,
                        GPtrArray         *data_files)
 {
-    /* Ignore duplicate change emissions originating from nautilus-directory */
+    /* Ignore duplicate change emissions originating from ammonite-directory */
     if (!g_ptr_array_find (data_files, file, NULL))
     {
-        g_ptr_array_add (data_files, nautilus_file_ref (file));
+        g_ptr_array_add (data_files, ammonite_file_ref (file));
     }
 }
 
 static void
-file_changes_done (NautilusFilesView *view,
+file_changes_done (AmmoniteFilesView *view,
                    gpointer           user_data)
 {
     gboolean *end_of_changes = user_data;
@@ -104,24 +104,24 @@ file_changes_done (NautilusFilesView *view,
     *end_of_changes = TRUE;
 }
 
-static NautilusFilesView *
-create_view_with_slot (NautilusMode         mode,
+static AmmoniteFilesView *
+create_view_with_slot (AmmoniteMode         mode,
                        uint                 view_id,
-                       NautilusWindowSlot **slot_out)
+                       AmmoniteWindowSlot **slot_out)
 {
-    NautilusWindowSlot *slot = nautilus_window_slot_new (mode);
+    AmmoniteWindowSlot *slot = ammonite_window_slot_new (mode);
     g_autoptr (GFile) location = g_file_new_for_path (g_get_home_dir ());
 
     /* Open the location to trigger view creation */
-    nautilus_window_slot_open_location_full (slot, location, NULL);
+    ammonite_window_slot_open_location_full (slot, location, NULL);
 
     /* The slot creates its content view after asynchronous loading */
-    ITER_CONTEXT_WHILE (nautilus_window_slot_get_current_view (slot) == NULL);
+    ITER_CONTEXT_WHILE (ammonite_window_slot_get_current_view (slot) == NULL);
 
-    NautilusFilesView *view = nautilus_window_slot_get_current_view (slot);
-    if (nautilus_files_view_get_view_id (view) != view_id)
+    AmmoniteFilesView *view = ammonite_window_slot_get_current_view (slot);
+    if (ammonite_files_view_get_view_id (view) != view_id)
     {
-        nautilus_files_view_change (view, view_id);
+        ammonite_files_view_change (view, view_id);
     }
 
     *slot_out = slot;
@@ -137,21 +137,21 @@ run_view_zoom_testcase (GSettings   *view_setting,
 {
     g_settings_set_enum (view_setting, zoom_setting_key, default_zoom_level);
 
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
                                                                       view_id,
                                                                       &slot);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
-    NautilusListBase *list_base = nautilus_files_view_get_private_list_base (files_view);
-    NautilusViewInfo view_info = nautilus_list_base_get_view_info (list_base);
+    AmmoniteListBase *list_base = ammonite_files_view_get_private_list_base (files_view);
+    AmmoniteViewInfo view_info = ammonite_list_base_get_view_info (list_base);
     const guint file_count = 10;
 
     create_multiple_files ("zoom_test", file_count);
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
-    GActionGroup *group = nautilus_files_view_get_private_action_group (files_view);
+    GActionGroup *group = ammonite_files_view_get_private_action_group (files_view);
     GAction *action_zoom_in = g_action_map_lookup_action (G_ACTION_MAP (group), "zoom-in");
     GAction *action_zoom_out = g_action_map_lookup_action (G_ACTION_MAP (group), "zoom-out");
     GAction *action_zoom_standard = g_action_map_lookup_action (G_ACTION_MAP (group),
@@ -203,16 +203,16 @@ test_zoom_actions (void)
     } testcases[] =
     {
         {
-            nautilus_list_view_preferences,
-            NAUTILUS_PREFERENCES_LIST_VIEW_DEFAULT_ZOOM_LEVEL,
-            NAUTILUS_LIST_ZOOM_LEVEL_MEDIUM,
-            NAUTILUS_VIEW_LIST_ID,
+            ammonite_list_view_preferences,
+            AMMONITE_PREFERENCES_LIST_VIEW_DEFAULT_ZOOM_LEVEL,
+            AMMONITE_LIST_ZOOM_LEVEL_MEDIUM,
+            AMMONITE_VIEW_LIST_ID,
         },
         {
-            nautilus_icon_view_preferences,
-            NAUTILUS_PREFERENCES_ICON_VIEW_DEFAULT_ZOOM_LEVEL,
-            NAUTILUS_GRID_ZOOM_LEVEL_MEDIUM,
-            NAUTILUS_VIEW_GRID_ID,
+            ammonite_icon_view_preferences,
+            AMMONITE_PREFERENCES_ICON_VIEW_DEFAULT_ZOOM_LEVEL,
+            AMMONITE_GRID_ZOOM_LEVEL_MEDIUM,
+            AMMONITE_VIEW_GRID_ID,
         },
     };
 
@@ -280,9 +280,9 @@ compress_callback (GFile    *new_file,
 static void
 test_extract_action (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE, NAUTILUS_VIEW_GRID_ID, &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE, AMMONITE_VIEW_GRID_ID, &slot);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     g_autoptr (GError) error = NULL;
     /* Create a file that will be compressed into an archive */
@@ -297,7 +297,7 @@ test_extract_action (void)
     g_assert_no_error (error);
 
     /* Compress it into a .zip archive */
-    nautilus_file_operations_compress (&(GList){ .data = document_location },
+    ammonite_file_operations_compress (&(GList){ .data = document_location },
                                        archive_file,
                                        AUTOAR_FORMAT_ZIP,
                                        AUTOAR_FILTER_NONE,
@@ -314,10 +314,10 @@ test_extract_action (void)
     g_assert_true (g_file_delete (document_location, NULL, NULL));
     g_assert_false (g_file_query_exists (document_location, NULL));
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
-    GActionGroup *group = nautilus_files_view_get_private_action_group (files_view);
+    GActionGroup *group = ammonite_files_view_get_private_action_group (files_view);
     GAction *action_extract_here = g_action_map_lookup_action (G_ACTION_MAP (group),
                                                                "extract-here");
 
@@ -326,13 +326,13 @@ test_extract_action (void)
     g_assert_false (g_action_get_enabled (action_extract_here));
 
     /* Select the archive file and extract it with the action */
-    g_autoptr (NautilusFile) archive_nautilus_file = nautilus_file_get (archive_file);
-    g_autoptr (NautilusFile) document_file = NULL;
-    g_autolist (NautilusFile) out_selection = NULL;
+    g_autoptr (AmmoniteFile) archive_ammonite_file = ammonite_file_get (archive_file);
+    g_autoptr (AmmoniteFile) document_file = NULL;
+    g_autolist (AmmoniteFile) out_selection = NULL;
 
-    nautilus_files_view_set_selection (files_view,
-                                       &(GList) { .data = archive_nautilus_file},
-                                       NAUTILUS_SELECTION_SOURCE_MANUAL);
+    ammonite_files_view_set_selection (files_view,
+                                       &(GList) { .data = archive_ammonite_file},
+                                       AMMONITE_SELECTION_SOURCE_MANUAL);
 
     /* It will switch between default activation and "extract-here" depending
      * on whether Files is the default app for zip archives. */
@@ -350,16 +350,16 @@ test_extract_action (void)
                                     "view.open-with-default-application", NULL);
     }
 
-    document_file = nautilus_file_get (document_location);
-    ITER_CONTEXT_WHILE (nautilus_view_model_get_item_for_file (model, document_file) == NULL);
+    document_file = ammonite_file_get (document_location);
+    ITER_CONTEXT_WHILE (ammonite_view_model_get_item_for_file (model, document_file) == NULL);
     g_assert_true (g_file_query_exists (document_location, NULL));
 
-    out_selection = nautilus_files_view_get_selection (files_view);
+    out_selection = ammonite_files_view_get_selection (files_view);
     g_assert_nonnull (out_selection);
     g_assert_cmpint (g_list_length (out_selection), ==, 1);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_OP_DONE);
+                     AMMONITE_SELECTION_SOURCE_OP_DONE);
     /* With text file selected, action should be disabled */
     g_assert_false (g_action_get_enabled (action_extract_here));
 
@@ -369,97 +369,97 @@ test_extract_action (void)
 static void
 test_selection_actions (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const guint file_count = 10, selected_count = 4;
-    g_autolist (NautilusFile) selection_set = NULL;
-    NautilusFileList *got_selection = NULL;
+    g_autolist (AmmoniteFile) selection_set = NULL;
+    AmmoniteFileList *got_selection = NULL;
     guint got_count;
 
     /* Need to subtract one since it creates an extra directory. */
     create_multiple_files ("select_test", file_count - 1);
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     for (guint i = 0; i < selected_count; i++)
     {
         g_autofree gchar *name = g_strdup_printf ("select_test_file_%u", i);
         g_autoptr (GFile) location = g_file_get_child (tmp_location, name);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
 
         selection_set = g_list_append (selection_set, g_steal_pointer (&file));
     }
 
     /* Set the selection on the view */
-    nautilus_files_view_set_selection (files_view,
+    ammonite_files_view_set_selection (files_view,
                                        selection_set,
-                                       NAUTILUS_SELECTION_SOURCE_AUTO);
+                                       AMMONITE_SELECTION_SOURCE_AUTO);
 
     /* Retrieve selection and verify it matches what we set */
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     got_count = g_list_length (got_selection);
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_AUTO);
+                     AMMONITE_SELECTION_SOURCE_AUTO);
     g_assert_cmpint (got_count, ==, selected_count);
 
-    for (NautilusFileList *l = got_selection; l != NULL; l = l->next)
+    for (AmmoniteFileList *l = got_selection; l != NULL; l = l->next)
     {
-        NautilusFile *file = l->data;
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = l->data;
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
         g_assert_nonnull (g_list_find (selection_set, file));
     }
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     /* Invert selection */
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.invert-selection", NULL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     got_count = g_list_length (got_selection);
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
     g_assert_cmpint (got_count, ==, file_count - selected_count);
 
-    for (NautilusFileList *l = got_selection; l != NULL; l = l->next)
+    for (AmmoniteFileList *l = got_selection; l != NULL; l = l->next)
     {
-        NautilusFile *file = l->data;
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = l->data;
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
         g_assert_null (g_list_find (selection_set, file));
     }
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     /* Select all */
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.select-all", NULL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     got_count = g_list_length (got_selection);
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
     g_assert_cmpint (got_count, ==, file_count);
     g_assert_cmpint (got_count, ==, g_list_model_get_n_items (G_LIST_MODEL (model)));
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     /* Invert selection to clear selection. */
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.invert-selection", NULL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
     g_assert_null (got_selection);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     test_clear_tmp_dir ();
 }
@@ -467,38 +467,38 @@ test_selection_actions (void)
 static void
 test_selection_source_in_search (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const guint file_count = 10;
-    g_autoptr (NautilusQuery) search_query = nautilus_query_new ();
-    NautilusFileList *got_selection = NULL;
+    g_autoptr (AmmoniteQuery) search_query = ammonite_query_new ();
+    AmmoniteFileList *got_selection = NULL;
 
     /* Need to subtract one since it creates an extra directory. */
     create_multiple_files ("select_test", file_count - 1);
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
-    nautilus_query_set_text (search_query, "2");
-    nautilus_query_set_location (search_query, tmp_location);
-    nautilus_files_view_set_search_query (files_view, search_query);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_query_set_text (search_query, "2");
+    ammonite_query_set_location (search_query, tmp_location);
+    ammonite_files_view_set_search_query (files_view, search_query);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_IN_SEARCH);
+                     AMMONITE_SELECTION_SOURCE_IN_SEARCH);
 
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, 1);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
-    /* Cannot check for NAUTILUS_SELECTION_SOURCE_AFTER_SEARCH because it is
+    /* Cannot check for AMMONITE_SELECTION_SOURCE_AFTER_SEARCH because it is
      * set through selection restoration through the slot. */
 
     test_clear_tmp_dir ();
@@ -512,51 +512,51 @@ test_open_item_location_in_search (void)
         "dir/my_nested_file",
         NULL
     };
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
-    g_autoptr (NautilusQuery) search_query = nautilus_query_new ();
+    g_autoptr (AmmoniteQuery) search_query = ammonite_query_new ();
     g_autoptr (GFile) dir_location = g_file_get_child (tmp_location, "dir");
     g_autoptr (GFile) nested_file_location = g_file_get_child (dir_location, "my_nested_file");
-    g_autolist (NautilusFile) out_selection = NULL;
+    g_autolist (AmmoniteFile) out_selection = NULL;
     g_autoptr (GFile) out_location = NULL;
 
     file_hierarchy_create (test_hierarchy, "");
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     /* The model should contain only the nested directory at this level. */
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, 1);
 
     /* Search for the nested file. */
-    nautilus_query_set_text (search_query, "my_nested_file");
-    nautilus_query_set_location (search_query, tmp_location);
-    nautilus_files_view_set_search_query (files_view, search_query);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_query_set_text (search_query, "my_nested_file");
+    ammonite_query_set_location (search_query, tmp_location);
+    ammonite_files_view_set_search_query (files_view, search_query);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_IN_SEARCH);
+                     AMMONITE_SELECTION_SOURCE_IN_SEARCH);
 
     /* Trigger the open-item-location action while searching. */
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.open-item-location", NULL);
     ITER_CONTEXT_WHILE (!g_file_equal (dir_location,
-                                       nautilus_files_view_get_location (files_view)));
+                                       ammonite_files_view_get_location (files_view)));
 
-    out_selection = nautilus_files_view_get_selection (files_view);
+    out_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (out_selection), ==, 1);
-    out_location = nautilus_file_get_location (out_selection->data);
+    out_location = ammonite_file_get_location (out_selection->data);
     g_assert_true (g_file_equal (out_location, nested_file_location));
 
     /* FIXME: This doesn't work since the slot doesn't store pending selection
      * source.
-     * g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+     * g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
      *                  ==,
-     *                  NAUTILUS_SELECTION_SOURCE_AFTER_SEARCH); */
+     *                  AMMONITE_SELECTION_SOURCE_AFTER_SEARCH); */
 
     test_clear_tmp_dir ();
 }
@@ -571,23 +571,23 @@ test_selection_source_operation (void)
         "file_4",
         NULL
     };
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const guint file_count = 4;
     const guint selected_count = 2;
     g_autolist (GFile) file_list = NULL;
-    g_autolist (NautilusFile) first_selection = NULL;
-    g_autolist (NautilusFile) second_selection = NULL;
-    NautilusFileList *got_selection = NULL;
+    g_autolist (AmmoniteFile) first_selection = NULL;
+    g_autolist (AmmoniteFile) second_selection = NULL;
+    AmmoniteFileList *got_selection = NULL;
 
     file_hierarchy_create (files_hierarchy, "");
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
@@ -597,14 +597,14 @@ test_selection_source_operation (void)
     for (guint i = 0; i < selected_count; i++)
     {
         GFile *location = g_list_nth_data (file_list, i);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
 
         first_selection = g_list_append (first_selection, g_steal_pointer (&file));
     }
     for (guint i = selected_count; i < file_count; i++)
     {
         GFile *location = g_list_nth_data (file_list, i);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
 
         second_selection = g_list_append (second_selection, g_steal_pointer (&file));
     }
@@ -617,68 +617,68 @@ test_selection_source_operation (void)
     /*
      * #1: No manual selection before the operation ends
      */
-    nautilus_files_view_set_selection (files_view,
+    ammonite_files_view_set_selection (files_view,
                                        first_selection,
-                                       NAUTILUS_SELECTION_SOURCE_MANUAL);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+                                       AMMONITE_SELECTION_SOURCE_MANUAL);
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.copy", NULL);
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.paste", NULL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_OP_START);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+                     AMMONITE_SELECTION_SOURCE_OP_START);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_selection_source (files_view) !=
-                        NAUTILUS_SELECTION_SOURCE_OP_DONE);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_selection_source (files_view) !=
+                        AMMONITE_SELECTION_SOURCE_OP_DONE);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     /*
      * #2: Manual selection before the operation ends
      */
-    nautilus_files_view_set_selection (files_view,
+    ammonite_files_view_set_selection (files_view,
                                        first_selection,
-                                       NAUTILUS_SELECTION_SOURCE_MANUAL);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+                                       AMMONITE_SELECTION_SOURCE_MANUAL);
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.copy", NULL);
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.paste", NULL);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_OP_START);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+                     AMMONITE_SELECTION_SOURCE_OP_START);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
-    nautilus_files_view_set_selection (files_view,
+    ammonite_files_view_set_selection (files_view,
                                        second_selection,
-                                       NAUTILUS_SELECTION_SOURCE_MANUAL);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+                                       AMMONITE_SELECTION_SOURCE_MANUAL);
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
 
-    ITER_CONTEXT_WHILE (nautilus_file_undo_manager_get_state () ==
-                        NAUTILUS_FILE_UNDO_MANAGER_STATE_NONE);
-    got_selection = nautilus_files_view_get_selection (files_view);
+    ITER_CONTEXT_WHILE (ammonite_file_undo_manager_get_state () ==
+                        AMMONITE_FILE_UNDO_MANAGER_STATE_NONE);
+    got_selection = ammonite_files_view_get_selection (files_view);
     g_assert_cmpint (g_list_length (got_selection), ==, selected_count);
-    g_assert_cmpint (nautilus_files_view_get_selection_source (files_view),
+    g_assert_cmpint (ammonite_files_view_get_selection_source (files_view),
                      ==,
-                     NAUTILUS_SELECTION_SOURCE_MANUAL);
-    g_clear_pointer (&got_selection, nautilus_file_list_free);
+                     AMMONITE_SELECTION_SOURCE_MANUAL);
+    g_clear_pointer (&got_selection, ammonite_file_list_free);
 
     test_clear_tmp_dir ();
 }
@@ -711,26 +711,26 @@ static void
 test_hidden_files_renamed (void)
 {
     g_settings_set_boolean (gtk_filechooser_preferences,
-                            NAUTILUS_PREFERENCES_SHOW_HIDDEN_FILES,
+                            AMMONITE_PREFERENCES_SHOW_HIDDEN_FILES,
                             FALSE);
 
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const guint renamed_file_count = 4;
     g_autoptr (GPtrArray) renamed_files_arr = g_ptr_array_new_full (renamed_file_count,
-                                                                    (GDestroyNotify) nautilus_file_unref);
+                                                                    (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) changed_files_arr = g_ptr_array_new_full (renamed_file_count,
-                                                                    (GDestroyNotify) nautilus_file_unref);
+                                                                    (GDestroyNotify) ammonite_file_unref);
 
     create_hidden_files ();
 
     /* Load the directory with hidden files not shown. */
-    nautilus_files_view_set_location (NAUTILUS_FILES_VIEW (files_view), tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (AMMONITE_FILES_VIEW (files_view), tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     /* Rename a few hidden files to visible names and verify they appear. */
     g_signal_connect (files_view, "file-changed",
@@ -747,15 +747,15 @@ test_hidden_files_renamed (void)
         }
 
         g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (), orig_name, NULL);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
         g_autofree gchar *new_name = g_strdup_printf ("renamed_visible_%u", renamed);
 
         /* Ensure hidden files are not visible initially. */
-        g_assert_true (nautilus_file_is_hidden_file (file));
+        g_assert_true (ammonite_file_is_hidden_file (file));
         g_assert_null (item);
 
-        nautilus_file_rename (file, new_name, collect_renamed_files, renamed_files_arr);
+        ammonite_file_rename (file, new_name, collect_renamed_files, renamed_files_arr);
         renamed++;
     }
 
@@ -766,10 +766,10 @@ test_hidden_files_renamed (void)
     /* The renamed files should now be present in the view model. */
     for (guint i = 0; i < renamed_files_arr->len; i++)
     {
-        NautilusFile *file = renamed_files_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = renamed_files_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
-        g_assert_false (nautilus_file_is_hidden_file (file));
+        g_assert_false (ammonite_file_is_hidden_file (file));
         g_assert_nonnull (item);
     }
 
@@ -780,38 +780,38 @@ static void
 test_hidden_files_change (void)
 {
     g_settings_set_boolean (gtk_filechooser_preferences,
-                            NAUTILUS_PREFERENCES_SHOW_HIDDEN_FILES,
+                            AMMONITE_PREFERENCES_SHOW_HIDDEN_FILES,
                             FALSE);
 
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
 
     create_hidden_files ();
 
     /* Test visibility when hidden files are not shown. */
-    nautilus_files_view_set_location (NAUTILUS_FILES_VIEW (files_view), tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (AMMONITE_FILES_VIEW (files_view), tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     for (gchar **filename = hidden_files_hierarchy; *filename != NULL; filename++)
     {
         g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 *filename,
                                                                 NULL);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         if (strstr (*filename, "hidden"))
         {
-            g_assert_true (nautilus_file_is_hidden_file (file));
+            g_assert_true (ammonite_file_is_hidden_file (file));
             g_assert_null (item);
         }
         else
         {
-            g_assert_false (nautilus_file_is_hidden_file (file));
+            g_assert_false (ammonite_file_is_hidden_file (file));
             g_assert_nonnull (item);
         }
     }
@@ -819,25 +819,25 @@ test_hidden_files_change (void)
     /* Test visibility when hidden files are shown. */
     gtk_widget_activate_action (GTK_WIDGET (files_view), "view.show-hidden-files", NULL);
 
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     for (gchar **filename = hidden_files_hierarchy; *filename != NULL; filename++)
     {
         g_autoptr (GFile) location = g_file_new_build_filename (test_get_tmp_dir (),
                                                                 *filename,
                                                                 NULL);
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
 
         if (strstr (*filename, "hidden"))
         {
-            g_assert_true (nautilus_file_is_hidden_file (file));
+            g_assert_true (ammonite_file_is_hidden_file (file));
         }
         else
         {
-            g_assert_false (nautilus_file_is_hidden_file (file));
+            g_assert_false (ammonite_file_is_hidden_file (file));
         }
     }
 
@@ -863,25 +863,23 @@ static void
 test_replace_files (void)
 {
     /* This is not reproducible using files created in tmpfs. */
-    g_test_bug ("https://gitlab.gnome.org/GNOME/nautilus/-/issues/3959");
-
     g_settings_set_boolean (gtk_filechooser_preferences,
-                            NAUTILUS_PREFERENCES_SHOW_HIDDEN_FILES,
+                            AMMONITE_PREFERENCES_SHOW_HIDDEN_FILES,
                             FALSE);
 
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const gsize file_count = 10, replaced_file_count = 5;
     g_autoptr (GPtrArray) file_arr =
-        g_ptr_array_new_full (file_count, (GDestroyNotify) nautilus_file_unref);
+        g_ptr_array_new_full (file_count, (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) replacment_files_arr =
         g_ptr_array_new_full (replaced_file_count, (GDestroyNotify) g_object_unref);
     g_autoptr (GPtrArray) changed_files_arr =
-        g_ptr_array_new_full (replaced_file_count, (GDestroyNotify) nautilus_file_unref);
+        g_ptr_array_new_full (replaced_file_count, (GDestroyNotify) ammonite_file_unref);
     gboolean end_of_changes = FALSE;
 
     /* Create the files before loading the view and keep them in an array. */
@@ -903,11 +901,11 @@ test_replace_files (void)
                                    &error);
         g_assert_no_error (error);
 
-        g_ptr_array_add (file_arr, nautilus_file_get (file));
+        g_ptr_array_add (file_arr, ammonite_file_get (file));
     }
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
@@ -919,8 +917,8 @@ test_replace_files (void)
 
     for (gsize i = 0; i < replaced_file_count; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
-        g_autoptr (GFile) location = nautilus_file_get_location (file);
+        AmmoniteFile *file = file_arr->pdata[i];
+        g_autoptr (GFile) location = ammonite_file_get_location (file);
         g_autofree gchar *text = g_uuid_string_random ();
         gsize text_len = strlen (text);
         g_autoptr (GBytes) bytes = g_bytes_new_take (g_steal_pointer (&text), text_len);
@@ -945,9 +943,9 @@ test_replace_files (void)
 
     for (gsize i = 0; i < file_arr->len; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
-        g_autoptr (GFile) location = nautilus_file_get_location (file);
+        AmmoniteFile *file = file_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
+        g_autoptr (GFile) location = ammonite_file_get_location (file);
 
         /* Ignore replaced files as they are not guaranteed to stay the same */
         if (!g_ptr_array_find_with_equal_func (replacment_files_arr, location,
@@ -959,8 +957,8 @@ test_replace_files (void)
     for (gsize i = 0; i < replacment_files_arr->len; i++)
     {
         GFile *location = replacment_files_arr->pdata[i];
-        g_autoptr (NautilusFile) file = nautilus_file_get (location);
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (location);
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         /* GIO might use a temperarly hidden file for writing that starts with
          * a dot like ".goutputstream-XXXXXX". Ensure the file is visible after
@@ -969,8 +967,8 @@ test_replace_files (void)
     }
     for (gsize i = 0; i < changed_files_arr->len; i++)
     {
-        NautilusFile *file = changed_files_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = changed_files_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
     }
@@ -981,19 +979,19 @@ test_replace_files (void)
 static void
 test_rename_files (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     const guint file_count = 10, renamed_file_count = 5;
     g_autoptr (GPtrArray) file_arr = g_ptr_array_new_full (file_count,
-                                                           (GDestroyNotify) nautilus_file_unref);
+                                                           (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) renamed_files_arr = g_ptr_array_new_full (renamed_file_count,
-                                                                    (GDestroyNotify) nautilus_file_unref);
+                                                                    (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) changed_files_arr =
-        g_ptr_array_new_full (renamed_file_count, (GDestroyNotify) nautilus_file_unref);
+        g_ptr_array_new_full (renamed_file_count, (GDestroyNotify) ammonite_file_unref);
 
     /* Create the files before loading the view and keep them in an array. */
     for (guint i = 0; i < file_count; i++)
@@ -1003,11 +1001,11 @@ test_rename_files (void)
         g_autoptr (GFileOutputStream) out = g_file_create (file, G_FILE_CREATE_NONE, NULL, NULL);
 
         g_assert_nonnull (out);
-        g_ptr_array_add (file_arr, nautilus_file_get (file));
+        g_ptr_array_add (file_arr, ammonite_file_get (file));
     }
 
-    nautilus_files_view_set_location (files_view, tmp_location);
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ammonite_files_view_set_location (files_view, tmp_location);
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
@@ -1017,10 +1015,10 @@ test_rename_files (void)
 
     for (guint i = 0; i < renamed_file_count; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
-        g_autoptr (GFile) location = nautilus_file_get_location (file);
+        AmmoniteFile *file = file_arr->pdata[i];
+        g_autoptr (GFile) location = ammonite_file_get_location (file);
         g_autofree gchar *file_name = g_strdup_printf ("test_file_%i.txt", i);
-        nautilus_file_rename (file, file_name, collect_renamed_files, renamed_files_arr);
+        ammonite_file_rename (file, file_name, collect_renamed_files, renamed_files_arr);
     }
 
     ITER_CONTEXT_WHILE (changed_files_arr->len < renamed_file_count ||
@@ -1029,20 +1027,20 @@ test_rename_files (void)
 
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
-    /* Both renamed and non-renamed nautilus file pointers from before renaming
+    /* Both renamed and non-renamed ammonite file pointers from before renaming
      * should still point to the same files in the view. Renaming should not
-     * make the old pointers invalid since we're using nautilus_file_rename(). */
+     * make the old pointers invalid since we're using ammonite_file_rename(). */
     for (guint i = 0; i < file_arr->len; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = file_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
     }
     for (guint i = 0; i < renamed_files_arr->len; i++)
     {
-        NautilusFile *file = renamed_files_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = renamed_files_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         g_assert_nonnull (item);
     }
@@ -1051,33 +1049,33 @@ test_rename_files (void)
 }
 
 static void
-collect_removed_files_cb (NautilusFilesView *view,
+collect_removed_files_cb (AmmoniteFilesView *view,
                           GList             *removed_files,
-                          NautilusDirectory *directory,
+                          AmmoniteDirectory *directory,
                           GPtrArray         *data_files)
 {
     for (GList *link = removed_files; link != NULL; link = link->next)
     {
-        g_ptr_array_add (data_files, nautilus_file_ref (NAUTILUS_FILE (link->data)));
+        g_ptr_array_add (data_files, ammonite_file_ref (AMMONITE_FILE (link->data)));
     }
 }
 
 static void
 test_remove_files (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     g_autofree gchar *uri = g_file_get_uri (tmp_location);
     const guint file_count = 10, deleted_file_count = 5;
     g_autoptr (GPtrArray) file_arr = g_ptr_array_new_full (file_count,
-                                                           (GDestroyNotify) nautilus_file_unref);
+                                                           (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) deleted_files_arr = g_ptr_array_new ();
     g_autoptr (GPtrArray) callback_arr = g_ptr_array_new_full (file_count,
-                                                               (GDestroyNotify) nautilus_file_unref);
+                                                               (GDestroyNotify) ammonite_file_unref);
 
     /* Create the files before loading the view and keep them in an array. */
     for (guint i = 0; i < file_count; i++)
@@ -1087,15 +1085,15 @@ test_remove_files (void)
         g_autoptr (GFileOutputStream) out = g_file_create (file, G_FILE_CREATE_NONE, NULL, NULL);
 
         g_assert_nonnull (out);
-        g_ptr_array_add (file_arr, nautilus_file_get (file));
+        g_ptr_array_add (file_arr, ammonite_file_get (file));
     }
 
-    nautilus_files_view_set_location (files_view, tmp_location);
+    ammonite_files_view_set_location (files_view, tmp_location);
 
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_true (g_file_equal (tmp_location,
-                                 nautilus_files_view_get_location (files_view)));
+                                 ammonite_files_view_get_location (files_view)));
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count);
 
 
@@ -1105,7 +1103,7 @@ test_remove_files (void)
 
     for (guint i = 0; i < deleted_file_count; i++)
     {
-        g_autoptr (GFile) location = nautilus_file_get_location (file_arr->pdata[i]);
+        g_autoptr (GFile) location = ammonite_file_get_location (file_arr->pdata[i]);
         g_autoptr (GError) error = NULL;
         g_file_delete (location, NULL, &error);
 
@@ -1121,8 +1119,8 @@ test_remove_files (void)
 
     for (guint i = 0; i < file_arr->len; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
-        NautilusViewItem *item = nautilus_view_model_get_item_for_file (model, file);
+        AmmoniteFile *file = file_arr->pdata[i];
+        AmmoniteViewItem *item = ammonite_view_model_get_item_for_file (model, file);
 
         if (g_ptr_array_find (deleted_files_arr, file, NULL))
         {
@@ -1138,47 +1136,47 @@ test_remove_files (void)
 }
 
 static void
-collect_added_files_cb (NautilusFilesView *view,
+collect_added_files_cb (AmmoniteFilesView *view,
                         GList             *added_files,
                         GPtrArray         *data_files)
 {
     for (GList *link = added_files; link != NULL; link = link->next)
     {
-        g_ptr_array_add (data_files, nautilus_file_ref (NAUTILUS_FILE (link->data)));
+        g_ptr_array_add (data_files, ammonite_file_ref (AMMONITE_FILE (link->data)));
     }
 }
 
 static void
 test_add_files (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     g_autofree gchar *uri = g_file_get_uri (tmp_location);
     const guint file_count = 10;
     g_autoptr (GPtrArray) file_arr = g_ptr_array_new_full (file_count,
-                                                           (GDestroyNotify) nautilus_file_unref);
+                                                           (GDestroyNotify) ammonite_file_unref);
     g_autoptr (GPtrArray) callback_arr = g_ptr_array_new_full (file_count,
-                                                               (GDestroyNotify) nautilus_file_unref);
+                                                               (GDestroyNotify) ammonite_file_unref);
 
-    nautilus_files_view_set_location (files_view, tmp_location);
+    ammonite_files_view_set_location (files_view, tmp_location);
 
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
     g_assert_true (g_file_equal (tmp_location,
-                                 nautilus_files_view_get_location (files_view)));
+                                 ammonite_files_view_get_location (files_view)));
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, 0);
 
-    /* Keep a list of NautilusFiles */
+    /* Keep a list of AmmoniteFiles */
     for (guint i = 0; i < file_count; i++)
     {
         g_autofree gchar *file_name = g_strdup_printf ("test_file_%i", i);
         g_autoptr (GFile) location = g_file_get_child (tmp_location, file_name);
 
-        g_ptr_array_add (file_arr, nautilus_file_get (location));
+        g_ptr_array_add (file_arr, ammonite_file_get (location));
     }
 
     /* Create files and verify that the view added the correct files */
@@ -1186,7 +1184,7 @@ test_add_files (void)
 
     for (guint i = 0; i < file_arr->len; i++)
     {
-        g_autoptr (GFile) location = nautilus_file_get_location (file_arr->pdata[i]);
+        g_autoptr (GFile) location = ammonite_file_get_location (file_arr->pdata[i]);
         g_autoptr (GFileOutputStream) out = g_file_create (location,
                                                            G_FILE_CREATE_NONE, NULL, NULL);
 
@@ -1199,9 +1197,9 @@ test_add_files (void)
 
     for (guint i = 0; i < file_arr->len; i++)
     {
-        NautilusFile *file = file_arr->pdata[i];
+        AmmoniteFile *file = file_arr->pdata[i];
 
-        g_assert_nonnull (nautilus_view_model_get_item_for_file (model, file));
+        g_assert_nonnull (ammonite_view_model_get_item_for_file (model, file));
     }
 
     test_clear_tmp_dir ();
@@ -1210,11 +1208,11 @@ test_add_files (void)
 static void
 test_load_dir (void)
 {
-    g_autoptr (NautilusWindowSlot) slot = NULL;
-    g_autoptr (NautilusFilesView) files_view = create_view_with_slot (NAUTILUS_MODE_BROWSE,
-                                                                      NAUTILUS_VIEW_GRID_ID,
+    g_autoptr (AmmoniteWindowSlot) slot = NULL;
+    g_autoptr (AmmoniteFilesView) files_view = create_view_with_slot (AMMONITE_MODE_BROWSE,
+                                                                      AMMONITE_VIEW_GRID_ID,
                                                                       &slot);
-    NautilusViewModel *model = nautilus_files_view_get_private_model (files_view);
+    AmmoniteViewModel *model = ammonite_files_view_get_private_model (files_view);
     g_autoptr (GFile) tmp_location = g_file_new_for_path (test_get_tmp_dir ());
     g_autofree gchar *uri = g_file_get_uri (tmp_location);
     gboolean loading_started = FALSE, loading_ended = FALSE;
@@ -1223,15 +1221,15 @@ test_load_dir (void)
     create_multiple_files ("view_test", file_count);
 
     /* Verify loading signals and location */
-    nautilus_files_view_set_location (files_view, tmp_location);
+    ammonite_files_view_set_location (files_view, tmp_location);
     g_signal_connect_swapped (files_view, "begin-loading", G_CALLBACK (set_true), &loading_started);
     g_signal_connect_swapped (files_view, "end-loading", G_CALLBACK (set_true), &loading_ended);
 
-    g_assert_true (nautilus_files_view_get_loading (files_view));
+    g_assert_true (ammonite_files_view_get_loading (files_view));
 
-    ITER_CONTEXT_WHILE (nautilus_files_view_get_loading (files_view));
+    ITER_CONTEXT_WHILE (ammonite_files_view_get_loading (files_view));
 
-    GFile *view_location = nautilus_files_view_get_location (files_view);
+    GFile *view_location = ammonite_files_view_get_location (files_view);
     g_autofree gchar *view_uri = g_file_get_uri (view_location);
 
     g_assert_true (g_file_equal (tmp_location, view_location));
@@ -1256,8 +1254,8 @@ test_load_dir (void)
     g_assert_cmpint (g_list_model_get_n_items (G_LIST_MODEL (model)), ==, file_count + 1);
     while (g_file_enumerator_iterate (enumerator, NULL, &child, NULL, NULL) && child != NULL)
     {
-        g_autoptr (NautilusFile) file = nautilus_file_get (child);
-        g_assert_nonnull (nautilus_view_model_get_item_for_file (model, file));
+        g_autoptr (AmmoniteFile) file = ammonite_file_get (child);
+        g_assert_nonnull (ammonite_view_model_get_item_for_file (model, file));
         counter++;
     }
     g_assert_cmpint (counter, ==, file_count + 1);
@@ -1269,24 +1267,24 @@ int
 main (int   argc,
       char *argv[])
 {
-    g_autoptr (NautilusTagManager) tag_manager = NULL;
+    g_autoptr (AmmoniteTagManager) tag_manager = NULL;
 
     gtk_test_init (&argc, &argv, NULL);
 
-    if (nautilus_application_is_sandboxed ())
+    if (ammonite_application_is_sandboxed ())
     {
         g_message ("files-view tests don't work inside a sandbox.");
 
         return 77;
     }
 
-    nautilus_register_resource ();
-    nautilus_ensure_extension_points ();
-    nautilus_global_preferences_init ();
-    tag_manager = nautilus_tag_manager_new_dummy ();
+    ammonite_register_resource ();
+    ammonite_ensure_extension_points ();
+    ammonite_global_preferences_init ();
+    tag_manager = ammonite_tag_manager_new_dummy ();
     test_init_config_dir ();
 
-    g_autoptr (NautilusApplication) app = nautilus_application_new ();
+    g_autoptr (AmmoniteApplication) app = ammonite_application_new ();
 
     g_test_add_func ("/view/load_dir",
                      test_load_dir);

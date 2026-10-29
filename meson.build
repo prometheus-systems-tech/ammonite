@@ -1,19 +1,19 @@
 project(
-  'nautilus',
+  'ammonite',
   'c',
   default_options: [
     'c_std=c11',
     'warning_level=2',
   ],
   # Do not forget when releasing:
-  #  * Set release date in data/org.gnome.Nautilus.metainfo.xml.in.in
+  #  * Set release date in data/org.ammonite.Ammonite.metainfo.xml.in.in
   version: '52.alpha',
   meson_version: '>= 1.1.0',
   license: 'GPL-3.0-or-later',
 )
 
-nautilus_extension_version = '4.1'
-nautilus_extension_major_version = nautilus_extension_version.split('.')[0]
+ammonite_extension_version = '4.1'
+ammonite_extension_major_version = ammonite_extension_version.split('.')[0]
 
 ###############
 # Directories #
@@ -30,8 +30,8 @@ localedir = get_option('localedir')
 docdir = datadir / 'doc'
 extensiondir = join_paths(
   libdir,
-  'nautilus',
-  'extensions-' + nautilus_extension_major_version,
+  'ammonite',
+  'extensions-' + ammonite_extension_major_version,
 )
 servicedir = join_paths(datadir, 'dbus-1', 'services')
 
@@ -69,8 +69,7 @@ add_project_arguments(
       '-Werror=undef',
       '-Werror=uninitialized',
       # There are currently too many warnings caused by deprecations, hindering the usefulness
-      # of any other warnings. Disable them until
-      # https://gitlab.gnome.org/GNOME/nautilus/-/issues/2722 is resolved.
+      # of any other warnings. Disable them until they are resolved.
       '-Wno-deprecated-declarations',
       # We want the general warnings in Wextra, but as GLib functions commonly accept additional
       # user data, warnings for function casts are not feasible. Neither are warnings for unused
@@ -175,7 +174,7 @@ if get_option('profile') == 'Devel'
   name_suffix = ' (Development Snapshot)'
 endif
 
-application_id = 'org.gnome.Nautilus' + app_id_suffix
+application_id = 'org.ammonite.Ammonite' + app_id_suffix
 
 if profile == ''
   # Example: 40.0
@@ -186,11 +185,11 @@ else
 endif
 
 conf.set_quoted('APPLICATION_ID', application_id)
-conf.set_quoted('GETTEXT_PACKAGE', 'nautilus')
+conf.set_quoted('GETTEXT_PACKAGE', 'ammonite')
 conf.set_quoted('LOCALEDIR', join_paths(prefix, localedir))
 conf.set_quoted('NAME_SUFFIX', name_suffix)
-conf.set_quoted('NAUTILUS_DATADIR', join_paths(prefix, datadir, 'nautilus'))
-conf.set_quoted('NAUTILUS_EXTENSIONDIR', join_paths(prefix, extensiondir))
+conf.set_quoted('AMMONITE_DATADIR', join_paths(prefix, datadir, 'ammonite'))
+conf.set_quoted('AMMONITE_EXTENSIONDIR', join_paths(prefix, extensiondir))
 conf.set_quoted('PACKAGE_VERSION', meson.project_version())
 conf.set_quoted('PROFILE', profile)
 conf.set_quoted('VERSION', version_string)
@@ -223,7 +222,7 @@ config_h = declare_dependency(
 # End configuration #
 #####################
 
-nautilus_include_dirs = include_directories('.', 'libnautilus-extension')
+ammonite_include_dirs = include_directories('.', 'libammonite-extension')
 
 #########
 # Build #
@@ -231,7 +230,7 @@ nautilus_include_dirs = include_directories('.', 'libnautilus-extension')
 
 subdirs = [
   'data',
-  'libnautilus-extension',
+  'libammonite-extension',
   'po',
   'src',
 ]

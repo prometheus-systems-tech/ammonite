@@ -1,8 +1,8 @@
 #include <glib.h>
 
-#include "nautilus-file.h"
-#include "nautilus-file-private.h"
-#include "src/nautilus-file-utilities.h"
+#include "ammonite-file.h"
+#include "ammonite-file-private.h"
+#include "src/ammonite-file-utilities.h"
 
 #include "test-utilities.h"
 
@@ -28,12 +28,12 @@ test_common_prefix_two_strings (void)
         { "fools", "rools", NULL, 4 },
         { "tes.txt", "tes.tar", NULL, 4 },
         { "nau tilus.c", "nau tilus.cpp", "nau tilus", 4 },
-        { "nautilus ", "nautilus two", "nautilus", 4 },
-        { "nautilus !£ $\"    foo.tar.gz", "nautilus !£ $\"  .lzma", "nautilus !£ $\"", 4 },
+        { "ammonite ", "ammonite two", "ammonite", 4 },
+        { "ammonite !£ $\"    foo.tar.gz", "ammonite !£ $\"  .lzma", "ammonite !£ $\"", 4 },
         {
-            "nautilus (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\".mp4",
-            "nautilus (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\".srt",
-            "nautilus (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\"",
+            "ammonite (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\".mp4",
+            "ammonite (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\".srt",
+            "ammonite (2018!£$%^&* ()_+-={}[ ];':@#~<>?,./\"",
             4
         },
         { "ӶtestӶ234", "ӶtestӶ1", "ӶtestӶ", 4 },
@@ -51,7 +51,7 @@ test_common_prefix_two_strings (void)
         const TwoStringPrefixTest *test = &tests[i];
         const char * const filenames[3] = { test->a, test->b, NULL };
         g_autofree char *actual =
-            nautilus_get_common_filename_prefix_from_filenames (filenames, test->min_length);
+            ammonite_get_common_filename_prefix_from_filenames (filenames, test->min_length);
 
         g_assert_cmpstr (actual, ==, test->prefix);
     }
@@ -65,7 +65,7 @@ test_swapped_char (GStrv list,
 
     list[position][2] = 'X';
 
-    g_autofree char *actual = nautilus_get_common_filename_prefix_from_filenames ((const char * const *) list, 4);
+    g_autofree char *actual = ammonite_get_common_filename_prefix_from_filenames ((const char * const *) list, 4);
     g_assert_null (actual);
 
     list[position][2] = swapped_char;
@@ -84,7 +84,7 @@ test_common_prefix_multiple_strings (void)
     }
     list[n_strings] = NULL;
 
-    actual = nautilus_get_common_filename_prefix_from_filenames ((const char * const *) list, 4);
+    actual = ammonite_get_common_filename_prefix_from_filenames ((const char * const *) list, 4);
     g_assert_cmpstr ("we are no longer the knights who say nii", ==, actual);
 
     /* make first string differ */
@@ -104,7 +104,7 @@ get_files_for_names (const GStrv files_names)
     {
         gchar *name = files_names[i];
         g_autofree gchar *uri = g_strconcat ("file:///", name, NULL);
-        NautilusFile *file = nautilus_file_get_by_uri (uri);
+        AmmoniteFile *file = ammonite_file_get_by_uri (uri);
 
         if (name[strlen (name) - 1] == G_DIR_SEPARATOR)
         {
@@ -130,14 +130,14 @@ test_common_prefix_filename (void)
     };
 
     /* Test empty list */
-    g_assert_null (nautilus_get_common_filename_prefix (NULL, 1));
+    g_assert_null (ammonite_get_common_filename_prefix (NULL, 1));
 
     for (guint i = 0; tests[i].a != NULL; i += 1)
     {
         const TwoStringPrefixTest *test = &tests[i];
         const char * const filenames[3] = { test->a, test->b, NULL };
-        g_autolist (NautilusFile) files = get_files_for_names ((GStrv) filenames);
-        g_autofree gchar *actual = nautilus_get_common_filename_prefix (files, 1);
+        g_autolist (AmmoniteFile) files = get_files_for_names ((GStrv) filenames);
+        g_autofree gchar *actual = ammonite_get_common_filename_prefix (files, 1);
 
         g_assert_cmpstr (actual, ==, test->prefix);
     }
@@ -177,9 +177,9 @@ test_directory_empty_check (void)
     file_hierarchy_create (hierarchy, "");
 
     empty_tests = 3;
-    nautilus_is_directory_empty (empty, empty_check_callback, GINT_TO_POINTER (TRUE));
-    nautilus_is_directory_empty (non_empty, empty_check_callback, GINT_TO_POINTER (FALSE));
-    nautilus_is_directory_empty (nested, empty_check_callback, GINT_TO_POINTER (FALSE));
+    ammonite_is_directory_empty (empty, empty_check_callback, GINT_TO_POINTER (TRUE));
+    ammonite_is_directory_empty (non_empty, empty_check_callback, GINT_TO_POINTER (FALSE));
+    ammonite_is_directory_empty (nested, empty_check_callback, GINT_TO_POINTER (FALSE));
 
     ITER_CONTEXT_WHILE (empty_tests > 0);
 
@@ -193,7 +193,7 @@ main (int   argc,
     g_test_init (&argc, &argv, NULL);
     g_test_bug_base ("http://bugzilla.gnome.org/show_bug.cgi?id=747907");
     g_test_set_nonfatal_assertions ();
-    nautilus_ensure_extension_points ();
+    ammonite_ensure_extension_points ();
 
     g_test_add_func ("/common-prefix/two-strings",
                      test_common_prefix_two_strings);

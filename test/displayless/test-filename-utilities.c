@@ -1,36 +1,36 @@
 #include <glib.h>
 
-#include <nautilus-filename-utilities.h>
+#include <ammonite-filename-utilities.h>
 
 
 static void
 test_filename_extension (void)
 {
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc"), ==, "");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abcdef"), ==, "");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.def"), ==, ".def");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.def ghi"), ==, "");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.def.ghi"), ==, ".ghi");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc"), ==, "");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abcdef"), ==, "");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.def"), ==, ".def");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.def ghi"), ==, "");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.def.ghi"), ==, ".ghi");
 }
 
 static void
 test_filename_extension_end_position (void)
 {
     const char *filename_with_ext = "abc.def.ghi";
-    const char *extension = nautilus_filename_get_extension (filename_with_ext);
+    const char *extension = ammonite_filename_get_extension (filename_with_ext);
     g_assert_true (extension == filename_with_ext + strlen ("abc.def"));
 
     const char *filename_without_ext = "abcdefghi";
-    const char *non_extension = nautilus_filename_get_extension (filename_without_ext);
+    const char *non_extension = ammonite_filename_get_extension (filename_without_ext);
     g_assert_true (non_extension == filename_without_ext + strlen (filename_without_ext));
 }
 
 static void
 test_filename_extension_with_tar (void)
 {
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.gz"), ==, ".gz");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.def.gz"), ==, ".gz");
-    g_assert_cmpstr (nautilus_filename_get_extension ("abc.tar.gz"), ==, ".tar.gz");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.gz"), ==, ".gz");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.def.gz"), ==, ".gz");
+    g_assert_cmpstr (ammonite_filename_get_extension ("abc.tar.gz"), ==, ".tar.gz");
 }
 
 static void
@@ -38,7 +38,7 @@ test_filename_create_file_copy (void)
 {
 #define ASSERT_DUPLICATION_NAME(ORIGINAL, DUPLICATE) \
         { \
-            g_autofree char *duplicated = nautilus_filename_for_copy (ORIGINAL, 1, -1, FALSE); \
+            g_autofree char *duplicated = ammonite_filename_for_copy (ORIGINAL, 1, -1, FALSE); \
             g_assert_cmpstr (duplicated, ==, DUPLICATE); \
         }
 
@@ -77,7 +77,7 @@ test_filename_create_dir_copy (void)
 {
 #define ASSERT_DUPLICATION_NAME(ORIGINAL, DUPLICATE) \
         { \
-            g_autofree char *duplicated = nautilus_filename_for_copy (ORIGINAL, 1, -1, TRUE); \
+            g_autofree char *duplicated = ammonite_filename_for_copy (ORIGINAL, 1, -1, TRUE); \
             g_assert_cmpstr (duplicated, ==, DUPLICATE); \
         }
 
@@ -92,7 +92,7 @@ test_filename_create_conflict_name (void)
 {
 #define ASSERT_DUPLICATION_NAME(ORIGINAL, DUPLICATE) \
         { \
-            g_autofree char *duplicated = nautilus_filename_for_conflict (ORIGINAL, 1, -1, FALSE); \
+            g_autofree char *duplicated = ammonite_filename_for_conflict (ORIGINAL, 1, -1, FALSE); \
             g_assert_cmpstr (duplicated, ==, DUPLICATE); \
         }
 
@@ -131,7 +131,7 @@ test_filename_shortening_with_base (void)
 
     g_assert_cmpuint (strlen (filename), >, max_length);
 
-    gboolean shortened = nautilus_filename_shorten_base (&filename, long_base, max_length);
+    gboolean shortened = ammonite_filename_shorten_base (&filename, long_base, max_length);
 
     g_assert_true (shortened);
 
@@ -149,7 +149,7 @@ test_filename_shortening_with_base_not_needed (void)
 
     g_assert_cmpuint (strlen (filename), <=, max_length);
 
-    gboolean shortened = nautilus_filename_shorten_base (&filename, short_base, max_length);
+    gboolean shortened = ammonite_filename_shorten_base (&filename, short_base, max_length);
 
     g_assert_false (shortened);
 

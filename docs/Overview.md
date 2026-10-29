@@ -1,11 +1,11 @@
 = File Ownership =
-In the minimal case, a nautilus file is owned by:
+In the minimal case, a ammonite file is owned by:
 - Window slot -> viewed_file
 - Window slot -> history list using bookmarks
 - Path bar -> button -> file
-- Path bar -> button -> nautilus_drag_slot_proxy
+- Path bar -> button -> ammonite_drag_slot_proxy
 
-When a file is a bookmark, nautilus application keeps a list with them, so it
+When a file is a bookmark, ammonite application keeps a list with them, so it
 also owns those files.
 
 Window slot is the creator of the file if the file was already not present due

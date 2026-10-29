@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# file-torture.py - Simple torture test for file notifications in Nautilus
+# file-torture.py - Simple torture test for file notifications in Ammonite
 # Copyright (C) 2006 Federico Mena-Quintero
 #
 # This program is free software; you can redistribute it and/or modify
