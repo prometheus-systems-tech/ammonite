@@ -1,3 +1,17 @@
+Major Changes in 1.0.0
+======================
+First release of Ammonite, forked from GNOME Files (Nautilus).
+
+* Enhancements:
+- Add an optional folder tree to the sidebar
+- Expand or collapse folders in the tree by double-clicking them
+- Allow the sidebar width to be adjusted by dragging its edge
+
+* Cleanups:
+- Rename Nautilus to Ammonite throughout and remove upstream URLs
+
+Entries below this point are the history of the upstream Nautilus project.
+
 Major Changes in 51.0.1
 =======================
 * Bugfixes:

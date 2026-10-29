@@ -21,33 +21,17 @@
   <launchable type="desktop-id">@appid@.desktop</launchable>
   <releases>
     <release version="@release-version@" type="snapshot"/>
-    <release version="51.0.1" type="stable" date="2026-09-15">
+    <release version="1.0.0" type="stable" date="2026-10-29">
       <description>
+        <p>First release of Ammonite, forked from GNOME Files (Nautilus).</p>
         <ul>
-          <li>Tab overview button in narrow mode</li>
-          <li>Smoother navigation by delayed clearing</li>
-          <li>Show count badge when while dragging multiple files</li>
-          <li>Open locations from other apps in new tabs</li>
-          <li>Add an empty document menu entry in case of empty templates directory</li>
-          <li>Selection handling improvements</li>
-          <li>Correctly raise the window when other apps call “Open location”</li>
-          <li>Type-to-search support in app chooser dialog</li>
-          <li>Accessibility enhancement, e.g. for filename entry feedback</li>
+          <li>Optional folder tree in the sidebar</li>
+          <li>Double-click folders in the tree to expand or collapse them</li>
+          <li>Adjustable sidebar width</li>
+          <li>Everything renamed from Nautilus to Ammonite</li>
         </ul>
       </description>
     </release>
-    <release version="51~rc" type="development" date="2026-08-29"/>
-    <release version="51~beta" type="development" date="2026-08-01"/>
-    <release version="51~alpha" type="development" date="2026-06-28"/>
-    <release version="50.0" type="stable" date="2026-03-14"/>
-    <release version="50~rc" type="development" date="2026-03-01"/>
-    <release version="50~beta" type="development" date="2026-02-01"/>
-    <release version="50~alpha" type="development" date="2026-01-07"/>
-    <release version="49.4" type="stable" date="2026-02-02"/>
-    <release version="49.3" type="stable" date="2026-01-07"/>
-    <release version="49.2" type="stable" date="2025-11-23"/>
-    <release version="49.1" type="stable" date="2025-10-13"/>
-    <release version="49.0" type="stable" date="2025-09-15"/>
   </releases>
   <project_group>GNOME</project_group>
   <project_license>GPL-3.0-or-later</project_license>

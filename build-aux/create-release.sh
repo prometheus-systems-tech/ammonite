@@ -17,27 +17,29 @@ latest_commit=$(git rev-parse HEAD)
 previous_tag=$(git describe --tags --abbrev=0)
 
 # Calculate next version
-IFS='.' read -r major minor patch <<< "${release_version}"
-case "$minor" in
+# Versions are MAJOR.MINOR.MICRO. Development cycles on main go through
+# MAJOR.MINOR.alpha, .beta and .rc before MAJOR.MINOR.0 is released.
+IFS='.' read -r major minor micro <<< "${release_version}"
+case "$micro" in
 	"alpha")
-		next_version="${major}.beta"
+		next_version="${major}.${minor}.beta"
 		;;
 	"beta")
-		next_version="${major}.rc"
+		next_version="${major}.${minor}.rc"
 		;;
 	"rc")
-		next_version="${major}.0"
+		next_version="${major}.${minor}.0"
 		;;
 	*)
-		if [[ ! "$minor" =~ ^[0-9]+$ ]]; then
+		if [[ ! "$minor" =~ ^[0-9]+$ || ! "$micro" =~ ^[0-9]+$ ]]; then
 			echo "Error: Don't know how to handle version '${release_version}'"
 			exit 1
 		elif [[ ${current_branch} = "main" ]] ; then
-			# if branch is main increase major number
-			next_version="$((major+1)).alpha"
+			# if branch is main start the next minor cycle
+			next_version="${major}.$((minor + 1)).alpha"
 		else
-			# otherwise increase minor
-			next_version="${major}.$((minor + 1))"
+			# otherwise increase micro (fixes on a stable branch)
+			next_version="${major}.${minor}.$((micro + 1))"
 		fi
 		;;
 esac
@@ -102,8 +104,7 @@ release_notes=$(git diff --unified=0 --color=never NEWS | grep -E '^\+[^+]' | se
 ### metainfo.xml ###
 
 date=$(date --iso-8601)
-next_minor="${next_version##*.}"
-type=$([[ "$next_minor" =~ ^[1-9][0-9]*$ ]] && echo "stable" || echo "development")
+type=$([[ "${release_version##*.}" =~ ^[0-9]+$ ]] && echo "stable" || echo "development")
 metainfo_release_version=$(echo ${release_version} | sed -E "s/\.([a-z]+)/~\1/")
 
 snapshot="<release version=\"@release-version@\" type=\"snapshot\"\/>"
@@ -131,5 +132,5 @@ git commit -m "Post-release version bump"
 release_notes="${release_message}
 ${release_notes}"
 echo Release commits created. Tag release with:
-echo "git tag -s ${release_version} ${release_commit} -m \"${release_notes}\""
+echo "git tag -s v${release_version} ${release_commit} -m \"${release_notes}\""
 echo "git push --tags"

@@ -7,7 +7,7 @@ project(
   ],
   # Do not forget when releasing:
   #  * Set release date in data/org.ammonite.Ammonite.metainfo.xml.in.in
-  version: '52.alpha',
+  version: '1.0.0',
   meson_version: '>= 1.1.0',
   license: 'GPL-3.0-or-later',
 )
