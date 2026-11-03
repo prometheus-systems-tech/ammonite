@@ -4,7 +4,12 @@
 #include "ammonite-folder-tree.h"
 
 #include <glib/gi18n.h>
+#ifdef GDK_WINDOWING_X11
+#include <gdk/x11/gdkx.h>
+#endif
 
+#include "ammonite-dnd.h"
+#include "ammonite-file.h"
 #include "ammonite-window-slot.h"
 
 #define TREE_ATTRIBUTES "standard::file,standard::name,standard::display-name,standard::type," \
@@ -129,6 +134,93 @@ on_row_double_click (GtkGestureClick *gesture,
     }
 }
 
+/* Returns the directory a tree row represents, or NULL. */
+static GFile *
+get_row_file (GtkTreeExpander *expander)
+{
+    GtkTreeListRow *row = gtk_tree_expander_get_list_row (expander);
+    g_autoptr (GFileInfo) info = NULL;
+
+    if (row == NULL)
+    {
+        return NULL;
+    }
+    info = gtk_tree_list_row_get_item (row);
+
+    return info != NULL ? g_object_ref (info_get_file (info)) : NULL;
+}
+
+static GdkDragAction
+on_row_drop_motion (GtkDropTarget *target,
+                    gdouble        x,
+                    gdouble        y,
+                    gpointer       user_data)
+{
+    AmmoniteFolderTree *self = user_data;
+    GtkTreeExpander *expander = GTK_TREE_EXPANDER (gtk_event_controller_get_widget (GTK_EVENT_CONTROLLER (target)));
+    g_autoptr (GFile) location = get_row_file (expander);
+    g_autoptr (AmmoniteFile) target_file = NULL;
+    const GValue *value = gtk_drop_target_get_value (target);
+    GSList *items;
+
+    if (location == NULL || self->window_slot == NULL ||
+        ammonite_window_slot_get_mode (self->window_slot) != AMMONITE_MODE_BROWSE)
+    {
+        gtk_drop_target_reject (target);
+        return 0;
+    }
+
+    if (value == NULL || !G_VALUE_HOLDS (value, GDK_TYPE_FILE_LIST))
+    {
+        return 0;
+    }
+
+    items = g_value_get_boxed (value);
+    target_file = ammonite_file_get (location);
+
+    return ammonite_dnd_get_preferred_action (target_file, items != NULL ? items->data : NULL);
+}
+
+static gboolean
+on_row_drop (GtkDropTarget *target,
+             const GValue  *value,
+             gdouble        x,
+             gdouble        y,
+             gpointer       user_data)
+{
+    AmmoniteFolderTree *self = user_data;
+    GtkTreeExpander *expander = GTK_TREE_EXPANDER (gtk_event_controller_get_widget (GTK_EVENT_CONTROLLER (target)));
+    g_autoptr (GFile) location = get_row_file (expander);
+    AmmoniteFilesView *view;
+    GdkDragAction action;
+
+    if (location == NULL || self->window_slot == NULL ||
+        ammonite_window_slot_get_mode (self->window_slot) != AMMONITE_MODE_BROWSE)
+    {
+        return FALSE;
+    }
+
+    view = ammonite_window_slot_get_current_view (self->window_slot);
+    if (view == NULL)
+    {
+        return FALSE;
+    }
+
+    action = gdk_drop_get_actions (gtk_drop_target_get_current_drop (target));
+
+    #ifdef GDK_WINDOWING_X11
+    if (GDK_IS_X11_DISPLAY (gtk_widget_get_display (GTK_WIDGET (expander))))
+    {
+        /* Same workaround as the path bar: the preferred action isn't
+         * reported correctly on X11 (GTK MR 4982). */
+        GdkDrag *drag = gdk_drop_get_drag (gtk_drop_target_get_current_drop (target));
+        action = gdk_drag_get_selected_action (drag);
+    }
+    #endif
+
+    return ammonite_dnd_perform_drop (view, value, action, location);
+}
+
 static void
 factory_setup (GtkSignalListItemFactory *factory,
                GtkListItem              *list_item,
@@ -139,6 +231,16 @@ factory_setup (GtkSignalListItemFactory *factory,
 
     g_signal_connect (click, "pressed", G_CALLBACK (on_row_double_click), expander);
     gtk_widget_add_controller (expander, GTK_EVENT_CONTROLLER (click));
+    {
+        GtkDropTarget *drop_target = gtk_drop_target_new (G_TYPE_INVALID, GDK_ACTION_ALL);
+
+        gtk_drop_target_set_preload (drop_target, TRUE);
+        gtk_drop_target_set_gtypes (drop_target, (GType[1]) { GDK_TYPE_FILE_LIST }, 1);
+        g_signal_connect (drop_target, "enter", G_CALLBACK (on_row_drop_motion), user_data);
+        g_signal_connect (drop_target, "motion", G_CALLBACK (on_row_drop_motion), user_data);
+        g_signal_connect (drop_target, "drop", G_CALLBACK (on_row_drop), user_data);
+        gtk_widget_add_controller (expander, GTK_EVENT_CONTROLLER (drop_target));
+    }
     GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 6);
     GtkWidget *image = gtk_image_new ();
     GtkWidget *label = gtk_label_new (NULL);
