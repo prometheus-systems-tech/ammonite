@@ -2392,7 +2392,7 @@ real_open_console (AmmoniteFile      *file,
     uri = ammonite_file_get_uri (file);
     parameters = g_variant_new_parsed ("([%s], @a{sv} {})", uri);
     ammonite_dbus_launcher_call (ammonite_dbus_launcher_get (),
-                                 AMMONITE_DBUS_LAUNCHER_CONSOLE,
+                                 app,
                                  "Open",
                                  parameters, GTK_WINDOW (window));
 }
@@ -2414,6 +2414,72 @@ action_open_console (GSimpleAction *action,
 static void
 action_current_dir_open_console (GSimpleAction *action,
                                  GVariant      *state,
+static AmmoniteDBusLauncherApp
+get_preferred_terminal_app (void)
+{
+    GSettingsSchemaSource *source = g_settings_schema_source_get_default ();
+    g_autoptr (GSettingsSchema) schema = NULL;
+
+    if (source != NULL)
+    {
+        schema = g_settings_schema_source_lookup (source,
+                                                  "org.gnome.desktop.default-applications.terminal",
+                                                  TRUE);
+    }
+
+    if (schema != NULL)
+    {
+        g_autoptr (GSettings) settings = NULL;
+        g_autofree gchar *exec = NULL;
+
+        settings = g_settings_new_full (schema, NULL, NULL);
+        exec = g_settings_get_string (settings, "exec");
+
+        if (exec != NULL)
+        {
+            if (strstr (exec, "ptyxis") != NULL)
+            {
+                return AMMONITE_DBUS_LAUNCHER_PTYXIS;
+            }
+            if (strstr (exec, "kgx") != NULL || strstr (exec, "console") != NULL)
+            {
+                return AMMONITE_DBUS_LAUNCHER_CONSOLE;
+            }
+        }
+    }
+
+    return AMMONITE_DBUS_APP_0;
+}
+
+/* Prefer the system default terminal if we support it and it is installed,
+ * otherwise use the first supported terminal that is available. */
+static gboolean
+terminal_available (AmmoniteDBusLauncherApp *app_out)
+{
+    AmmoniteDBusLauncher *launcher = ammonite_dbus_launcher_get ();
+    AmmoniteDBusLauncherApp preferred = get_preferred_terminal_app ();
+    const AmmoniteDBusLauncherApp candidates[] = {
+        preferred,
+        AMMONITE_DBUS_LAUNCHER_PTYXIS,
+        AMMONITE_DBUS_LAUNCHER_CONSOLE,
+    };
+
+    for (guint i = 0; i < G_N_ELEMENTS (candidates); i++)
+    {
+        if (candidates[i] != AMMONITE_DBUS_APP_0 &&
+            ammonite_dbus_launcher_is_available (launcher, candidates[i]))
+        {
+            if (app_out != NULL)
+            {
+                *app_out = candidates[i];
+            }
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
                                  gpointer       user_data)
 {
     g_return_if_fail (AMMONITE_IS_FILES_VIEW (user_data));
@@ -2421,6 +2487,12 @@ action_current_dir_open_console (GSimpleAction *action,
     AmmoniteFilesView *self = user_data;
     real_open_console (self->directory_as_file, self);
 }
+    AmmoniteDBusLauncherApp app;
+
+    if (!terminal_available (&app))
+    {
+        return;
+    }
 
 static void
 action_properties (GSimpleAction *action,
@@ -7351,12 +7423,10 @@ ammonite_files_view_update_actions_state (AmmoniteFilesView *self)
     files_action_set_enabled (self, "console",
                               mode == AMMONITE_MODE_BROWSE &&
                               list_len_is_one (selection) && ammonite_file_is_directory (selection->data) &&
-                              ammonite_dbus_launcher_is_available (ammonite_dbus_launcher_get (),
-                                                                   AMMONITE_DBUS_LAUNCHER_CONSOLE));
+                              terminal_available (NULL));
     files_action_set_enabled (self, "current-directory-console",
                               mode == AMMONITE_MODE_BROWSE &&
-                              ammonite_dbus_launcher_is_available (ammonite_dbus_launcher_get (),
-                                                                   AMMONITE_DBUS_LAUNCHER_CONSOLE));
+                              terminal_available (NULL));
     files_action_set_enabled (self, "properties",
                               mode == AMMONITE_MODE_BROWSE &&
                               (is_network_view ?

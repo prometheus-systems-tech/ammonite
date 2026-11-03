@@ -268,6 +268,7 @@ ammonite_dbus_launcher_init (AmmoniteDBusLauncher *self)
     ammonite_dbus_launcher_data_init (self, AMMONITE_DBUS_LAUNCHER_SETTINGS);
     ammonite_dbus_launcher_data_init (self, AMMONITE_DBUS_LAUNCHER_DISKS);
     ammonite_dbus_launcher_data_init (self, AMMONITE_DBUS_LAUNCHER_CONSOLE);
+    ammonite_dbus_launcher_data_init (self, AMMONITE_DBUS_LAUNCHER_PTYXIS);
 
     g_dbus_proxy_new_for_bus (G_BUS_TYPE_SESSION, G_DBUS_PROXY_FLAGS_NONE, NULL,
                               "org.freedesktop.DBus",
@@ -285,5 +286,9 @@ ammonite_dbus_launcher_init (AmmoniteDBusLauncher *self)
 
     ammonite_dbus_launcher_create_proxy (self->data[AMMONITE_DBUS_LAUNCHER_CONSOLE],
                                          "org.gnome.Console", "/org/gnome/Console",
+                                         "org.freedesktop.Application");
+
+    ammonite_dbus_launcher_create_proxy (self->data[AMMONITE_DBUS_LAUNCHER_PTYXIS],
+                                         "org.gnome.Ptyxis", "/org/gnome/Ptyxis",
                                          "org.freedesktop.Application");
 }

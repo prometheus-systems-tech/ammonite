@@ -18,7 +18,7 @@
       <attribute name="show-in-mode">browse</attribute>
     </item>
     <item>
-      <attribute name="label" translatable="yes">Open in Consol_e</attribute>
+      <attribute name="label" translatable="yes">Open in _Terminal</attribute>
       <attribute name="action">view.current-directory-console</attribute>
       <attribute name="hidden-when">action-disabled</attribute>
     </item>
@@ -107,7 +107,7 @@
               <attribute name="hidden-when">action-disabled</attribute>
             </item>
             <item>
-              <attribute name="label" translatable="yes">Open in Consol_e</attribute>
+              <attribute name="label" translatable="yes">Open in _Terminal</attribute>
               <attribute name="action">view.console</attribute>
               <attribute name="hidden-when">action-disabled</attribute>
             </item>

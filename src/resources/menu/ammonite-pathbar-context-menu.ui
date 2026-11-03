@@ -31,7 +31,7 @@
       <attribute name="action">view.open-current-directory-with-other-application</attribute>
     </item>
     <item>
-      <attribute name="label" translatable="yes">Open in Consol_e</attribute>
+      <attribute name="label" translatable="yes">Open in _Terminal</attribute>
       <attribute name="action">view.current-directory-console</attribute>
       <attribute name="hidden-when">action-disabled</attribute>
     </item>
