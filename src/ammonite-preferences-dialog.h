@@ -2,6 +2,7 @@
 /*
  * SPDX-FileCopyrightText: 2002 Jan Arne Petersen
  * SPDX-FileCopyrightText: 2016 Carlos Soriano <csoriano@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *

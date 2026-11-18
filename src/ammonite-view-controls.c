@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2022 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
@@ -10,7 +11,10 @@
 #include "ammonite-file-utilities.h"
 #include "ammonite-scheme.h"
 #include "ammonite-ui-utilities.h"
+#include "ammonite-view-info.h"
 #include "ammonite-window-slot.h"
+
+#include <glib/gi18n.h>
 
 /* Assume sort section is second item in view_menu. See ammonite-view-controls.blp */
 #define SORT_ITEM_POSITION 1
@@ -244,6 +248,36 @@ ammonite_view_controls_class_init (AmmoniteViewControlsClass *klass)
     gtk_widget_class_bind_template_child (widget_class, AmmoniteViewControls, view_split_button);
 }
 
+/* Adds the "View As" section (list, icons, compact) after the sort section. */
+static void
+add_view_as_section (AmmoniteViewControls *self)
+{
+    static const struct
+    {
+        const char *label;
+        guint       view_id;
+    } modes[] =
+    {
+        { N_("_List"), AMMONITE_VIEW_LIST_ID },
+        { N_("_Icons"), AMMONITE_VIEW_GRID_ID },
+        { N_("_Compact"), AMMONITE_VIEW_COMPACT_ID },
+    };
+    g_autoptr (GMenu) section = g_menu_new ();
+    g_autoptr (GMenuItem) section_item = NULL;
+
+    for (guint i = 0; i < G_N_ELEMENTS (modes); i++)
+    {
+        g_autoptr (GMenuItem) item = g_menu_item_new (_(modes[i].label), NULL);
+
+        g_menu_item_set_action_and_target_value (item, "slot.files-view-mode",
+                                                 g_variant_new_uint32 (modes[i].view_id));
+        g_menu_append_item (section, item);
+    }
+
+    section_item = g_menu_item_new_section (_("View As"), G_MENU_MODEL (section));
+    g_menu_insert_item (G_MENU (self->view_menu), SORT_ITEM_POSITION + 1, section_item);
+}
+
 static void
 ammonite_view_controls_init (AmmoniteViewControls *self)
 {
@@ -256,4 +290,6 @@ ammonite_view_controls_init (AmmoniteViewControls *self)
     self->sort_section = G_MENU_MODEL (g_object_ref (gtk_builder_get_object (builder, "sort_section")));
     g_menu_item_set_section (sort_item, self->sort_section);
     g_menu_insert_item (G_MENU (self->view_menu), SORT_ITEM_POSITION, sort_item);
+
+    add_view_as_section (self);
 }

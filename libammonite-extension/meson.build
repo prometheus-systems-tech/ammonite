@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 libammonite_extension_headers = [
   'ammonite-column-provider.h',
   'ammonite-column.h',

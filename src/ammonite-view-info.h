@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2024 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -9,6 +10,7 @@
 /* Keep values in sync with the org.ammonite.ammonite.FolderView schema enums: */
 #define AMMONITE_VIEW_LIST_ID            1
 #define AMMONITE_VIEW_GRID_ID            2
+#define AMMONITE_VIEW_COMPACT_ID         4
 /* Special ids, not used by GSettings schemas: */
 #define AMMONITE_VIEW_NETWORK_ID         3
 #define AMMONITE_VIEW_INVALID_ID         0

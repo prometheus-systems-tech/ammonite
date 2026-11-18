@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
 BUILD_AUX=$(dirname "$BASH_SOURCE")
 UNCRUSTIFY=$(command -v uncrustify)
 

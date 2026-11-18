@@ -1,6 +1,8 @@
 /*
  * Copyright © 2025 Khalid Abu Shawarib <kas@gnome.org>
  *
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #define G_LOG_DOMAIN "test-files-view"

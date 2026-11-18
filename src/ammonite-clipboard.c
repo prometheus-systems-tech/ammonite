@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 1999, 2000 Free Software Foundaton
  * SPDX-FileCopyrightText: 2000, 2001 Eazel, Inc.
  * SPDX-FileCopyrightText: 2016 Carlos Soriano <csoriano@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *

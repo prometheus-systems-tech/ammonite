@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 tracker_sandbox = find_program('localsearch')
 
 tests = {

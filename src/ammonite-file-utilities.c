@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 1999, 2000, 2001 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -24,14 +25,22 @@
 #include <glib/gstdio.h>
 #include <gio/gio.h>
 #include <unistd.h>
+#ifdef __linux__
 #include <sys/vfs.h>
+#else
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <string.h>
+#endif
 
 #define AMMONITE_USER_DIRECTORY_NAME "ammonite"
 #define DEFAULT_AMMONITE_DIRECTORY_MODE (0755)
 
+#ifdef __linux__
 /* From linux/magic.h */
 #ifndef AUTOFS_SUPER_MAGIC
 #define AUTOFS_SUPER_MAGIC 0x0187
+#endif
 #endif
 
 char *
@@ -1132,7 +1141,11 @@ ammonite_location_is_autofs_mountpoint (GFile *location)
 
     close (fd);
 
+#ifdef __linux__
     return (buf.f_type == AUTOFS_SUPER_MAGIC);
+#else
+    return (strcmp (buf.f_fstypename, "autofs") == 0);
+#endif
 }
 
 gboolean

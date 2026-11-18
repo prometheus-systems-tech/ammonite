@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 1999, 2000 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *

@@ -1,6 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 1999, 2000 Free Software Foundation
  * SPDX-FileCopyrightText: 2000, 2001 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -41,6 +42,7 @@
 #include "ammonite-filename-utilities.h"
 #include "ammonite-floating-bar.h"
 #include "ammonite-global-preferences.h"
+#include "ammonite-compact-view.h"
 #include "ammonite-grid-view.h"
 #include "ammonite-grid-view-captions-dialog.h"
 #include "ammonite-list-view.h"
@@ -1500,6 +1502,39 @@ choose_program (AmmoniteFilesView *view,
 }
 
 static void
+default_app_chosen (AdwDialog *dialog,
+                    GAppInfo  *info,
+                    gpointer   user_data)
+{
+    /* The chooser already stored the new default; don't open anything. */
+    adw_dialog_close (dialog);
+}
+
+static void
+action_set_default_application (GSimpleAction *action,
+                                GVariant      *state,
+                                gpointer       user_data)
+{
+    g_return_if_fail (AMMONITE_IS_FILES_VIEW (user_data));
+
+    AmmoniteFilesView *self = user_data;
+    g_autolist (AmmoniteFile) selection = ammonite_files_view_get_selection (self);
+    AmmoniteAppChooser *dialog;
+
+    if (selection == NULL)
+    {
+        return;
+    }
+
+    dialog = ammonite_app_chooser_new (selection);
+    ammonite_app_chooser_set_default_only (dialog);
+    adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (self));
+    g_signal_connect_object (dialog, "app-chosen",
+                             G_CALLBACK (default_app_chosen),
+                             self, G_CONNECT_DEFAULT);
+}
+
+static void
 action_open_with_other_application (GSimpleAction *action,
                                     GVariant      *state,
                                     gpointer       user_data)
@@ -2381,39 +2416,6 @@ action_new_folder_with_selection (GSimpleAction *action,
     ammonite_files_view_new_folder (AMMONITE_FILES_VIEW (user_data), TRUE);
 }
 
-static void
-real_open_console (AmmoniteFile      *file,
-                   AmmoniteFilesView *view)
-{
-    GtkRoot *window = gtk_widget_get_root (GTK_WIDGET (view));
-    GVariant *parameters;
-    g_autofree gchar *uri = NULL;
-
-    uri = ammonite_file_get_uri (file);
-    parameters = g_variant_new_parsed ("([%s], @a{sv} {})", uri);
-    ammonite_dbus_launcher_call (ammonite_dbus_launcher_get (),
-                                 app,
-                                 "Open",
-                                 parameters, GTK_WINDOW (window));
-}
-
-static void
-action_open_console (GSimpleAction *action,
-                     GVariant      *state,
-                     gpointer       user_data)
-{
-    AmmoniteFilesView *self = user_data;
-    g_autolist (AmmoniteFile) selection = ammonite_files_view_get_selection (self);
-    gboolean is_single_selection = list_len_is_one (selection);
-
-    g_return_if_fail (is_single_selection);
-
-    real_open_console (AMMONITE_FILE (selection->data), self);
-}
-
-static void
-action_current_dir_open_console (GSimpleAction *action,
-                                 GVariant      *state,
 static AmmoniteDBusLauncherApp
 get_preferred_terminal_app (void)
 {
@@ -2480,6 +2482,45 @@ terminal_available (AmmoniteDBusLauncherApp *app_out)
     return FALSE;
 }
 
+static void
+real_open_console (AmmoniteFile      *file,
+                   AmmoniteFilesView *view)
+{
+    GtkRoot *window = gtk_widget_get_root (GTK_WIDGET (view));
+    GVariant *parameters;
+    g_autofree gchar *uri = NULL;
+    AmmoniteDBusLauncherApp app;
+
+    if (!terminal_available (&app))
+    {
+        return;
+    }
+
+    uri = ammonite_file_get_uri (file);
+    parameters = g_variant_new_parsed ("([%s], @a{sv} {})", uri);
+    ammonite_dbus_launcher_call (ammonite_dbus_launcher_get (),
+                                 app,
+                                 "Open",
+                                 parameters, GTK_WINDOW (window));
+}
+
+static void
+action_open_console (GSimpleAction *action,
+                     GVariant      *state,
+                     gpointer       user_data)
+{
+    AmmoniteFilesView *self = user_data;
+    g_autolist (AmmoniteFile) selection = ammonite_files_view_get_selection (self);
+    gboolean is_single_selection = list_len_is_one (selection);
+
+    g_return_if_fail (is_single_selection);
+
+    real_open_console (AMMONITE_FILE (selection->data), self);
+}
+
+static void
+action_current_dir_open_console (GSimpleAction *action,
+                                 GVariant      *state,
                                  gpointer       user_data)
 {
     g_return_if_fail (AMMONITE_IS_FILES_VIEW (user_data));
@@ -2487,12 +2528,6 @@ terminal_available (AmmoniteDBusLauncherApp *app_out)
     AmmoniteFilesView *self = user_data;
     real_open_console (self->directory_as_file, self);
 }
-    AmmoniteDBusLauncherApp app;
-
-    if (!terminal_available (&app))
-    {
-        return;
-    }
 
 static void
 action_properties (GSimpleAction *action,
@@ -6722,6 +6757,7 @@ static const GActionEntry view_entries[] =
     { .name = "open-item-location", .activate = action_open_item_location },
     { .name = "open-with-default-application", .activate = action_open_with_default_application },
     { .name = "open-with-other-application", .activate = action_open_with_other_application },
+    { .name = "set-default-application", .activate = action_set_default_application },
     {
         .name = "open-current-directory-with-other-application",
         .activate = action_open_current_directory_with_other_application
@@ -7258,6 +7294,12 @@ ammonite_files_view_update_actions_state (AmmoniteFilesView *self)
                               mode == AMMONITE_MODE_BROWSE &&
                               selection != NULL);
 
+    /* Changing the default association needs exactly one file (not a folder) */
+    files_action_set_enabled (self, "set-default-application",
+                              mode == AMMONITE_MODE_BROWSE &&
+                              list_len_is_one (selection) &&
+                              !ammonite_file_is_directory (selection->data));
+
     files_action_set_enabled (self, "open-item-new-tab",
                               mode == AMMONITE_MODE_BROWSE &&
                               item_opens_in_view);
@@ -7461,7 +7503,8 @@ ammonite_files_view_update_actions_state (AmmoniteFilesView *self)
                               AMMONITE_IS_LIST_VIEW (self->list_base));
 
     files_action_set_enabled (self, "visible-captions",
-                              AMMONITE_IS_GRID_VIEW (self->list_base));
+                              AMMONITE_IS_GRID_VIEW (self->list_base) &&
+                              ammonite_list_base_get_view_info (self->list_base).view_id == AMMONITE_VIEW_GRID_ID);
 
     update_zoom_actions_state (self);
 
@@ -9299,6 +9342,12 @@ create_inner_view (AmmoniteFilesView *self,
         }
         break;
 
+        case AMMONITE_VIEW_COMPACT_ID:
+        {
+            self->list_base = AMMONITE_LIST_BASE (ammonite_compact_view_new ());
+        }
+        break;
+
         case AMMONITE_VIEW_LIST_ID:
         {
             self->list_base = AMMONITE_LIST_BASE (ammonite_list_view_new ());
@@ -9345,8 +9394,14 @@ ammonite_files_view_get_toggle_icon_name (AmmoniteFilesView *self)
         }
         break;
 
-        case AMMONITE_VIEW_NETWORK_ID:
         case AMMONITE_VIEW_GRID_ID:
+        {
+            return "view-continuous-symbolic";
+        }
+        break;
+
+        case AMMONITE_VIEW_NETWORK_ID:
+        case AMMONITE_VIEW_COMPACT_ID:
         {
             return "view-list-symbolic";
         }
@@ -9386,8 +9441,18 @@ ammonite_files_view_get_toggle_tooltip (AmmoniteFilesView  *self,
         }
         break;
 
-        case AMMONITE_VIEW_NETWORK_ID:
         case AMMONITE_VIEW_GRID_ID:
+        {
+            if (description != NULL)
+            {
+                *description = _("View items in compact columns");
+            }
+            return _("Compact View");
+        }
+        break;
+
+        case AMMONITE_VIEW_NETWORK_ID:
+        case AMMONITE_VIEW_COMPACT_ID:
         {
             if (description != NULL)
             {

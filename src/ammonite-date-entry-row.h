@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2025 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *

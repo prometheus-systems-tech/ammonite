@@ -25,6 +25,7 @@
   <enum id="org.ammonite.ammonite.FolderView">
     <value value="1" nick="list-view"/>
     <value value="2" nick="icon-view"/>
+    <value value="4" nick="compact-view"/>
   </enum>
 
   <enum id="org.ammonite.ammonite.SortOrder">
@@ -99,7 +100,7 @@
       <description>If set to true, Ammonite will show a delete permanently context menu item to bypass the Trash.</description>
     </key>
     <key type="b" name="show-folder-tree">
-      <default>false</default>
+      <default>true</default>
       <summary>Show a folder tree in the sidebar</summary>
       <description>If set to true, the sidebar shows an expandable folder tree instead of the list of places.</description>
     </key>
@@ -161,9 +162,6 @@
       <description>If true, files in new windows will be sorted in reverse order. I.e., if sorted by name, then instead of sorting the files from “a” to “z”, they will be sorted from “z” to “a”; if sorted by size, instead of being incrementally they will be sorted decrementally.</description>
     </key>
     <key name="default-folder-viewer" enum="org.ammonite.ammonite.FolderView">
-      <aliases>
-        <alias value='compact-view' target='icon-view'/>
-      </aliases>
       <default>'icon-view'</default>
       <summary>Default folder viewer</summary>
       <description>When a folder is visited this viewer is used.</description>

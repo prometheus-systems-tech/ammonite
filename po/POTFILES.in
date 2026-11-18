@@ -60,6 +60,7 @@ src/ammonite-progress-info.c
 src/ammonite-progress-info-widget.c
 src/ammonite-progress-persistence-handler.c
 src/ammonite-properties.c
+src/ammonite-sharing-page.c
 src/ammonite-query-editor.c
 src/ammonite-rename-file-popover.c
 src/ammonite-search-directory-file.c

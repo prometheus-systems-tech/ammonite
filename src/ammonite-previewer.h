@@ -2,6 +2,7 @@
  * ammonite-previewer: ammonite previewer DBus wrapper
  *
  * SPDX-FileCopyrightText: 2011, Red Hat, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *

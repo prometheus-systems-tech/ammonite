@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2008 Free Software Foundation, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -25,6 +26,10 @@ typedef struct
     AmmoniteBookmark *current_location_bookmark;
 } AmmoniteNavigationState;
 
+GtkWidget *          ammonite_window_slot_get_pane_widget (AmmoniteWindowSlot *slot);
+AmmoniteWindowSlot * ammonite_window_slot_get_secondary (AmmoniteWindowSlot *slot);
+void                 ammonite_window_slot_set_secondary (AmmoniteWindowSlot *slot,
+                                                         AmmoniteWindowSlot *secondary);
 AmmoniteWindowSlot * ammonite_window_slot_new              (AmmoniteMode        mode);
 
 void ammonite_window_slot_open_location_full               (AmmoniteWindowSlot *slot,

@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ */
+
 using Gtk 4.0;
 using Adw 1;
 
@@ -17,7 +21,9 @@ menu view_menu {
 
   section {
     /* Sort section. The toolbar code assumes this is the second item of this
-     * menu model. Its contents is provided by the view.
+     * menu model. Its contents is provided by the view. The "View As" section
+     * is added right after it by the toolbar code, because its action targets
+     * must be typed numbers, which a Blueprint menu can't express.
      */
 
     /* Translators: a menu item in a group of sorting options in a toolbar menu, with criterions such as "A-Z" or "Last Modified". */

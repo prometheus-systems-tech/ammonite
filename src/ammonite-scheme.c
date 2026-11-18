@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2024 Peter Eisenmann <p3732@getgoogleoff.me>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */

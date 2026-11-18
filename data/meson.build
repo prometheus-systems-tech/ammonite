@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 icondir = join_paths('icons', 'hicolor', 'scalable', 'apps')
 install_data(
   join_paths(icondir, 'org.ammonite.Ammonite' + profile + '.svg'),

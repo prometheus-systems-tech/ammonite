@@ -1,7 +1,7 @@
 [library]
 version = "@VERSION@"
 description = "Ammonite Extension API"
-authors = "The GNOME Project"
+authors = "Ross WD Cameron"
 license = "GPL-3.0-or-later"
 logo_url = "logo.svg"
 devhelp = true

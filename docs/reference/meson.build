@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 toml_data = configuration_data()
 toml_data.set('VERSION', meson.project_version())
 

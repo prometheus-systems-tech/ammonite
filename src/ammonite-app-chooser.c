@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2022 António Fernandes <antoniof@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -9,6 +10,7 @@
 #include <adwaita.h>
 #include <glib/gi18n.h>
 
+#include "ammonite-application.h"
 #include "ammonite-file.h"
 #include "ammonite-signaller.h"
 #include "ammonite-app-chooser-widget.h"
@@ -21,6 +23,7 @@ struct _AmmoniteAppChooser
     char *type_description;
     gchar *file_name;
     gboolean single_content_type;
+    gboolean default_only;
 
     GtkWidget *ok_button;
     GtkWidget *content_box;
@@ -54,6 +57,52 @@ enum
 
 static guint signals[SIGNAL_LAST] = { 0, };
 
+/* Inside the sandbox GIO would write to the app's private config, which the
+ * host never reads, so edit the host's mimeapps.list directly. */
+static gboolean
+set_default_for_type (GAppInfo    *info,
+                      const char  *content_type,
+                      GError     **error)
+{
+    g_autoptr (GKeyFile) keyfile = g_key_file_new ();
+    g_autofree char *path = NULL;
+    g_autofree char *added = NULL;
+    const char *id = g_app_info_get_id (info);
+    g_autoptr (GError) load_error = NULL;
+
+    if (!ammonite_application_is_sandboxed ())
+    {
+        return g_app_info_set_as_default_for_type (info, content_type, error);
+    }
+
+    if (id == NULL)
+    {
+        g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                             _("The application has no desktop file ID"));
+        return FALSE;
+    }
+
+    path = g_build_filename (g_get_home_dir (), ".config", "mimeapps.list", NULL);
+    if (!g_key_file_load_from_file (keyfile, path, G_KEY_FILE_KEEP_COMMENTS, &load_error) &&
+        !g_error_matches (load_error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
+    {
+        g_propagate_error (error, g_steal_pointer (&load_error));
+        return FALSE;
+    }
+
+    g_key_file_set_string (keyfile, "Default Applications", content_type, id);
+
+    added = g_key_file_get_string (keyfile, "Added Associations", content_type, NULL);
+    if (added == NULL || strstr (added, id) == NULL)
+    {
+        g_autofree char *new_added = g_strdup_printf ("%s;%s", id, added != NULL ? added : "");
+
+        g_key_file_set_string (keyfile, "Added Associations", content_type, new_added);
+    }
+
+    return g_key_file_save_to_file (keyfile, path, error);
+}
+
 static void
 on_app_chosen (AmmoniteAppChooser *self)
 {
@@ -64,15 +113,18 @@ on_app_chosen (AmmoniteAppChooser *self)
     if (self->single_content_type)
     {
         /* The switch is insensitive if the selected app is already default */
-        if (gtk_widget_get_sensitive (self->set_default_row))
+        if (self->default_only)
+        {
+            set_new_default = TRUE;
+        }
+        else if (gtk_widget_get_sensitive (self->set_default_row))
         {
             set_new_default = adw_switch_row_get_active (ADW_SWITCH_ROW (self->set_default_row));
         }
 
         if (set_new_default)
         {
-            g_app_info_set_as_default_for_type (info, self->content_type,
-                                                &error);
+            set_default_for_type (info, self->content_type, &error);
             g_signal_emit_by_name (ammonite_signaller_get_current (), "mime-data-changed");
         }
 
@@ -338,6 +390,18 @@ ammonite_app_chooser_class_init (AmmoniteAppChooserClass *klass)
                              G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
 
     g_object_class_install_properties (object_class, G_N_ELEMENTS (properties), properties);
+}
+
+/* Make the dialog only change the default application for the file type,
+ * instead of also opening the files. */
+void
+ammonite_app_chooser_set_default_only (AmmoniteAppChooser *self)
+{
+    g_return_if_fail (AMMONITE_IS_APP_CHOOSER (self));
+
+    self->default_only = TRUE;
+    gtk_widget_set_visible (self->set_default_list_box, FALSE);
+    adw_dialog_set_title (ADW_DIALOG (self), _("Set Default Application"));
 }
 
 AmmoniteAppChooser *

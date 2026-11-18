@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2022 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -848,13 +849,23 @@ setup_cell_common (GObject          *listitem,
                    GtkWidget        *hover_target)
 {
     GtkExpression *expression;
-    GtkEventController *controller;
-    GtkDropTarget *drop_target;
 
     expression = gtk_property_expression_new (GTK_TYPE_LIST_ITEM, NULL, "item");
     expression = gtk_property_expression_new (GTK_TYPE_TREE_LIST_ROW, expression, "item");
     gtk_expression_bind (expression, cell, "item", listitem);
     g_object_bind_property (listitem, "position", cell, "position", G_BINDING_SYNC_CREATE);
+
+    setup_cell_controllers (cell, hover_target);
+}
+
+/* Event handling shared by all cells, for views that manage their own cells
+ * instead of using a GtkListItem. */
+void
+setup_cell_controllers (AmmoniteViewCell *cell,
+                        GtkWidget        *hover_target)
+{
+    GtkEventController *controller;
+    GtkDropTarget *drop_target;
 
     controller = GTK_EVENT_CONTROLLER (gtk_gesture_click_new ());
     gtk_widget_add_controller (GTK_WIDGET (cell), controller);

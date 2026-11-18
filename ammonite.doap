@@ -14,8 +14,9 @@
 
   <maintainer>
     <foaf:Person>
-      <foaf:name>Ross William Duncan Cameron</foaf:name>
-      <foaf:mbox rdf:resource="mailto:ross@wexfordhouse.co.za" />
+      <foaf:name>Ross WD Cameron</foaf:name>
+      <foaf:mbox rdf:resource="mailto:rwd.cameron@prometheus-systems.co.za" />
+      <foaf:homepage rdf:resource="https://x.com/rwdcameron" />
     </foaf:Person>
   </maintainer>
 

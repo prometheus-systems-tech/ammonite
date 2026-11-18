@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2000, 2001 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -1473,6 +1474,102 @@ application_unhandled_uri (ActivateParameters *parameters,
     }
 }
 
+/* The portal asks which app to use until the same app has been chosen a few
+ * times for a content type. When the user already has a default (set in the
+ * host's mimeapps.list), record it as chosen so the file opens straight away. */
+static void
+sandboxed_trust_default_app (GFile *location)
+{
+    g_autoptr (GFileInfo) info = NULL;
+    g_autoptr (GKeyFile) keyfile = g_key_file_new ();
+    g_autoptr (GDBusConnection) bus = NULL;
+    g_autoptr (GVariant) reply = NULL;
+    g_autoptr (GVariant) permissions = NULL;
+    g_autofree char *path = NULL;
+    g_autofree char *handler = NULL;
+    g_autofree char *default_ids = NULL;
+    GApplication *app = g_application_get_default ();
+    const char *app_id = app != NULL ? g_application_get_application_id (app) : NULL;
+    const char *content_type;
+    char *suffix;
+    char *separator;
+    g_auto (GStrv) stored = NULL;
+
+    info = g_file_query_info (location, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE,
+                              G_FILE_QUERY_INFO_NONE, NULL, NULL);
+    content_type = info != NULL ? g_file_info_get_content_type (info) : NULL;
+    if (content_type == NULL || app_id == NULL)
+    {
+        return;
+    }
+
+    path = g_build_filename (g_get_home_dir (), ".config", "mimeapps.list", NULL);
+    if (!g_key_file_load_from_file (keyfile, path, G_KEY_FILE_NONE, NULL))
+    {
+        return;
+    }
+    default_ids = g_key_file_get_string (keyfile, "Default Applications", content_type, NULL);
+    if (default_ids == NULL)
+    {
+        return;
+    }
+    separator = strchr (default_ids, ';');
+    if (separator != NULL)
+    {
+        *separator = '\0';
+    }
+    suffix = g_strrstr (default_ids, ".desktop");
+    if (suffix != NULL && suffix[strlen (".desktop")] == '\0')
+    {
+        *suffix = '\0';
+    }
+    if (default_ids[0] == '\0')
+    {
+        return;
+    }
+    handler = g_strdup (default_ids);
+
+    bus = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
+    if (bus == NULL)
+    {
+        return;
+    }
+
+    reply = g_dbus_connection_call_sync (bus,
+                                         "org.freedesktop.impl.portal.PermissionStore",
+                                         "/org/freedesktop/impl/portal/PermissionStore",
+                                         "org.freedesktop.impl.portal.PermissionStore",
+                                         "Lookup",
+                                         g_variant_new ("(ss)", "desktop-used-apps", content_type),
+                                         NULL, G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
+    if (reply != NULL)
+    {
+        g_autoptr (GVariant) table = g_variant_get_child_value (reply, 0);
+
+        if (g_variant_lookup (table, app_id, "^as", &stored) &&
+            g_strv_length (stored) == 3 &&
+            g_strcmp0 (stored[0], handler) == 0 &&
+            g_strcmp0 (stored[1], stored[2]) == 0)
+        {
+            return;
+        }
+    }
+
+    {
+        const char *entry[] = { handler, "3", "3", NULL };
+        g_autoptr (GVariant) result = NULL;
+
+        result = g_dbus_connection_call_sync (bus,
+                                              "org.freedesktop.impl.portal.PermissionStore",
+                                              "/org/freedesktop/impl/portal/PermissionStore",
+                                              "org.freedesktop.impl.portal.PermissionStore",
+                                              "SetPermission",
+                                              g_variant_new ("(sbss^as)", "desktop-used-apps", TRUE,
+                                                             content_type, app_id, entry),
+                                              NULL, G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
+    }
+}
+
 static void
 sandboxed_launcher_callback (GObject      *source_object,
                              GAsyncResult *res,
@@ -1742,6 +1839,7 @@ activate_files_internal (ActivateParameters *parameters)
         g_autoptr (GFile) location = g_file_new_for_uri (uri);
         g_autoptr (GtkFileLauncher) launcher = gtk_file_launcher_new (location);
 
+        sandboxed_trust_default_app (location);
         gtk_file_launcher_launch (launcher,
                                   parameters->parent_window,
                                   parameters->cancellable,

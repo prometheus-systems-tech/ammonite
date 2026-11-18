@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2015 Carlos Soriano <csoriano@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.1-or-later
  */

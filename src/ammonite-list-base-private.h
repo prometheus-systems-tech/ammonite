@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2022 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -27,6 +28,9 @@ void               ammonite_list_base_setup_gestures (AmmoniteListBase *self);
 /* Shareable helpers */
 void                          setup_cell_common                 (GObject          *listitem,
                                                                  AmmoniteViewCell *cell,
+                                                                 GtkWidget        *hover_target);
+
+void                          setup_cell_controllers            (AmmoniteViewCell *cell,
                                                                  GtkWidget        *hover_target);
 
 G_END_DECLS

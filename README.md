@@ -1,6 +1,6 @@
 # Ammonite
 
-Ammonite is a fork of GNOME Files (Nautilus), a file manager for GNOME. Its main difference is an optional folder tree in the sidebar (Preferences → General → "Folder Tree in Sidebar", off by default), which replaces the list of places.
+Ammonite is a fork of GNOME Files (Nautilus), a file manager for GNOME. Its main difference is a folder tree in the sidebar (Preferences → General → "Folder Tree in Sidebar", on by default and can be switched off), which replaces the list of places.
 
 Everything has been renamed from upstream, including the C identifiers (`ammonite_*`), the `org.ammonite.Ammonite` app ID and the GSettings schemas. The extension API is now `libammonite-extension`, so extensions written for Nautilus (such as `nautilus-python` ones) are not compatible. Merging upstream changes will need the rename applied to them.
 

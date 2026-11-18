@@ -4,6 +4,7 @@
  * during transfer operations.
  *
  * SPDX-FileCopyrightText: 2008, Cosimo Cecchi
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *

@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ */
+
 using Gtk 4.0;
 using Adw 1;
 
@@ -155,6 +159,16 @@ Adw.ShortcutsDialog shortcuts_dialog {
     Adw.ShortcutsItem {
       title: C_("shortcuts dialog", "Grid View");
       accelerator: "<Primary>2";
+    }
+
+    Adw.ShortcutsItem {
+      title: C_("shortcuts dialog", "Compact View");
+      accelerator: "<Primary>3";
+    }
+
+    Adw.ShortcutsItem {
+      title: C_("shortcuts dialog", "Two Panes");
+      action-name: "win.toggle-two-pane";
     }
 
     Adw.ShortcutsItem {

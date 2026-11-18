@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 menu_dirs="src/resources/menu"
 srcdirs="extensions src libammonite-extension"
 desktopdirs="data"

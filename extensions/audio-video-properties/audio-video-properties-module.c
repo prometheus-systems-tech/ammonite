@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2000, 2001 Eazel Inc.
  * SPDX-FileCopyrightText: 2003 Andrew Sobala <aes@gnome.org>
  * SPDX-FileCopyrightText: 2005 Bastien Nocera <hadess@hadess.net>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */

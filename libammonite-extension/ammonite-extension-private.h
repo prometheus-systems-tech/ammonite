@@ -2,6 +2,7 @@
  * ammonite-extension-private.h - Type definitions for Ammonite extensions
  *
  * SPDX-FileCopyrightText: 2009 Red Hat, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *

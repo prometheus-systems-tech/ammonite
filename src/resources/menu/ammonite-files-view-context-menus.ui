@@ -24,6 +24,13 @@
     </item>
     <section>
       <item>
+        <attribute name="label" translatable="yes">_Refresh</attribute>
+        <attribute name="action">slot.reload</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="label" translatable="yes">_Paste</attribute>
         <attribute name="action">view.paste</attribute>
         <attribute name="show-in-mode">browse</attribute>

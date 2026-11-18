@@ -1,4 +1,6 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Authors : Mr Jamie McCracken (jamiemcc at blueyonder dot co dot uk)

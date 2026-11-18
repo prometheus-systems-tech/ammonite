@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2000 Eazel, Inc.
  * SPDX-FileCopyrightText: 2001, 2002 Anders Carlsson <andersca@gnu.org>
  * SPDX-FileCopyrightText: 2022 GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */

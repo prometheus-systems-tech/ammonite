@@ -1,6 +1,8 @@
 /*
  * Copyright © 2025 Khalid Abu Shawarib
  *
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Tests for file creation operations

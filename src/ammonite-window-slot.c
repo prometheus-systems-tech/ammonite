@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2008 Free Software Foundation, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -75,6 +76,10 @@ struct _AmmoniteWindowSlot
 
     GtkWidget *stack;
     GtkWidget *vbox;
+
+    /* Two-pane mode: optional second slot shown beside this one. */
+    GtkWidget *paned;
+    AmmoniteWindowSlot *secondary;
     AdwStatusPage *global_search_page;
 
     GtkWidget *extra_location_widgets;
@@ -1075,7 +1080,8 @@ change_files_view_mode (AmmoniteWindowSlot *self,
                         guint               view_id)
 {
     g_return_if_fail (view_id == AMMONITE_VIEW_LIST_ID ||
-                      view_id == AMMONITE_VIEW_GRID_ID);
+                      view_id == AMMONITE_VIEW_GRID_ID ||
+                      view_id == AMMONITE_VIEW_COMPACT_ID);
 
     if (self->default_view_id != view_id)
     {
@@ -1101,9 +1107,14 @@ action_files_view_mode_toggle (GSimpleAction *action,
     }
 
     current_view_id = ammonite_files_view_get_view_id (self->content_view);
+    /* Cycle: list -> grid -> compact -> list */
     if (current_view_id == AMMONITE_VIEW_LIST_ID)
     {
         change_files_view_mode (self, AMMONITE_VIEW_GRID_ID);
+    }
+    else if (current_view_id == AMMONITE_VIEW_GRID_ID)
+    {
+        change_files_view_mode (self, AMMONITE_VIEW_COMPACT_ID);
     }
     else
     {
@@ -1326,6 +1337,9 @@ ammonite_window_slot_init (AmmoniteWindowSlot *self)
                                        "slot.files-view-mode", "<control>2",
                                        "u", AMMONITE_VIEW_GRID_ID);
     ADD_SHORTCUT_FOR_ACTION_WITH_ARGS (self->shortcuts,
+                                       "slot.files-view-mode", "<control>3",
+                                       "u", AMMONITE_VIEW_COMPACT_ID);
+    ADD_SHORTCUT_FOR_ACTION_WITH_ARGS (self->shortcuts,
                                        "slot.open-location", "<alt>Home|HomePage|Start",
                                        "s", home_uri);
     ADD_SHORTCUT_FOR_ACTION_WITH_ARGS (self->shortcuts,
@@ -1365,7 +1379,8 @@ ammonite_window_slot_init (AmmoniteWindowSlot *self)
 
     self->default_view_id = g_settings_get_enum (ammonite_preferences, AMMONITE_PREFERENCES_DEFAULT_FOLDER_VIEWER);
     if (G_UNLIKELY (self->default_view_id != AMMONITE_VIEW_LIST_ID &&
-                    self->default_view_id != AMMONITE_VIEW_GRID_ID))
+                    self->default_view_id != AMMONITE_VIEW_GRID_ID &&
+                    self->default_view_id != AMMONITE_VIEW_COMPACT_ID))
     {
         g_warning ("Invalid value stored for 'default-folder-viewer' key for "
                    "the 'org.ammonite.ammonite.preferences' schemas. Installed "
@@ -2824,6 +2839,57 @@ GList *
 ammonite_window_slot_get_forward_history (AmmoniteWindowSlot *self)
 {
     return self->forward_list;
+}
+
+GtkWidget *
+ammonite_window_slot_get_pane_widget (AmmoniteWindowSlot *self)
+{
+    return self->stack;
+}
+
+AmmoniteWindowSlot *
+ammonite_window_slot_get_secondary (AmmoniteWindowSlot *self)
+{
+    return self->secondary;
+}
+
+/* Shows @secondary beside @self, or removes the current secondary if NULL. */
+void
+ammonite_window_slot_set_secondary (AmmoniteWindowSlot *self,
+                                    AmmoniteWindowSlot *secondary)
+{
+    if (secondary != NULL && self->secondary == NULL)
+    {
+        int width = gtk_widget_get_width (GTK_WIDGET (self));
+
+        self->paned = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
+        gtk_paned_set_wide_handle (GTK_PANED (self->paned), TRUE);
+        gtk_paned_set_resize_start_child (GTK_PANED (self->paned), TRUE);
+        gtk_paned_set_resize_end_child (GTK_PANED (self->paned), TRUE);
+        gtk_paned_set_shrink_start_child (GTK_PANED (self->paned), FALSE);
+        gtk_paned_set_shrink_end_child (GTK_PANED (self->paned), FALSE);
+
+        g_object_ref (self->stack);
+        adw_bin_set_child (ADW_BIN (self), self->paned);
+        gtk_paned_set_start_child (GTK_PANED (self->paned), self->stack);
+        g_object_unref (self->stack);
+        gtk_paned_set_end_child (GTK_PANED (self->paned), GTK_WIDGET (secondary));
+        if (width > 0)
+        {
+            gtk_paned_set_position (GTK_PANED (self->paned), width / 2);
+        }
+        self->secondary = secondary;
+    }
+    else if (secondary == NULL && self->secondary != NULL)
+    {
+        g_object_ref (self->stack);
+        gtk_paned_set_start_child (GTK_PANED (self->paned), NULL);
+        gtk_paned_set_end_child (GTK_PANED (self->paned), NULL);
+        adw_bin_set_child (ADW_BIN (self), self->stack);
+        g_object_unref (self->stack);
+        self->paned = NULL;
+        self->secondary = NULL;
+    }
 }
 
 AmmoniteWindowSlot *

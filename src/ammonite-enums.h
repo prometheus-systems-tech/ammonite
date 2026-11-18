@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2018 Ernestas Kulik <ernestask@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -49,6 +50,20 @@ typedef enum
     AMMONITE_LIST_ZOOM_LEVEL_MEDIUM,
     AMMONITE_LIST_ZOOM_LEVEL_LARGE,
 } AmmoniteListZoomLevel;
+
+typedef enum
+{
+    AMMONITE_COMPACT_ICON_SIZE_SMALL  = 16,
+    AMMONITE_COMPACT_ICON_SIZE_MEDIUM = 24,
+    AMMONITE_COMPACT_ICON_SIZE_LARGE  = 32,
+} AmmoniteCompactIconSize;
+
+typedef enum
+{
+    AMMONITE_COMPACT_ZOOM_LEVEL_SMALL,
+    AMMONITE_COMPACT_ZOOM_LEVEL_MEDIUM,
+    AMMONITE_COMPACT_ZOOM_LEVEL_LARGE,
+} AmmoniteCompactZoomLevel;
 
 #define AMMONITE_ATTRIBUTE_N_TOTAL 9
 typedef enum

@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ammonite — a GNOME file manager with a folder tree</title>
+<meta name="description" content="Ammonite is a fork of GNOME Files with a folder tree in the sidebar, a compact multi-column layout, two-pane mode and scripts.">
+<link rel="icon" href="ammonite.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><img src="ammonite.svg" alt="">Ammonite</a>
+    <ul>
+      <li><a href="index.html#story">The story</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="scripting.html">Scripting</a></li>
+      <li><a href="index.html#fork">The fork</a></li>
+      <li><a href="index.html#try">Try it</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <img class="logo" src="ammonite.svg" alt="The Ammonite logo, a spiral-shelled cephalopod">
+    <h1>A file manager with a tree</h1>
+    <p class="lede">GNOME Files, plus a folder tree, a compact multi-column layout, two panes and scripts.</p>
+    <a class="btn" href="#features">See the features</a>
+    <a class="btn alt" href="scripting.html">Scripting docs</a>
+  </div>
+  <div class="wrap">
+    <figure class="shot full-shot">
+      <img src="screenshots/icons.png" alt="The Ammonite window with a folder tree in the sidebar and files shown as icons" width="1500" height="910">
+      <figcaption>Ammonite with the folder tree in the sidebar.</figcaption>
+    </figure>
+  </div>
+</header>
+
+<section id="story">
+  <div class="wrap narrow">
+    <div class="eyebrow">The short version</div>
+    <h2>Old-fashioned, and missing the tree</h2>
+    <p class="dim">By <a href="https://x.com/rwdcameron">Ross WD Cameron</a>, who maintains Ammonite.</p>
+    <p>
+      I'm old fashioned. I learned to find my way around a computer with a tree on the left
+      and my files on the right. Open a folder, see what's inside, open the next one, and always
+      be able to see where you are in the whole hierarchy.
+    </p>
+    <p>
+      Then I moved to GNOME, and I love it. The design is calm, consistent and thoughtful. Libadwaita,
+      the header bars, the typography, the way everything simply fits together. I wouldn't want to go back.
+    </p>
+    <p>
+      But the file manager has no tree. Not an option buried in a menu, not an extension. It has a list of
+      places, and you navigate from there, one folder at a time, with a breadcrumb for company.
+    </p>
+    <blockquote>I didn't want a different desktop. I wanted GNOME Files, with a tree.</blockquote>
+    <p>
+      So that's Ammonite. It is not a redesign and not a rebellion. It is GNOME Files with a tree, and since then a few more
+      things from the file managers I grew up with, made by someone who loves the rest of it too much to leave.
+    </p>
+  </div>
+</section>
+
+<section class="alt" id="problem">
+  <div class="wrap">
+    <div class="center narrow">
+      <div class="eyebrow">The itch</div>
+      <h2>Why a tree matters</h2>
+      <p class="dim">Breadcrumbs tell you where you are. A tree shows you where everything else is.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="num">1</div>
+        <h3>You see the whole shape</h3>
+        <p>Deeply nested projects, archives and backups are easier to hold in your head when you can see siblings and parents at the same time.</p>
+      </div>
+      <div class="card">
+        <div class="num">2</div>
+        <h3>Moving things is direct</h3>
+        <p>Dragging a file to a folder three levels up is trivial when that folder is already on screen, rather than something you navigate to and back from.</p>
+      </div>
+      <div class="card">
+        <div class="num">3</div>
+        <h3>Muscle memory carries over</h3>
+        <p>Decades of habit don't evaporate because the toolkit changed. A tree is a very old idea, and it is still a good one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="center narrow">
+      <div class="eyebrow">What's different</div>
+      <h2>Features</h2>
+      <p class="dim">Everything GNOME Files does, plus the things a long-time file manager user misses. All screenshots below are of Ammonite itself.</p>
+    </div>
+
+    <div class="split" style="margin-top:3.1rem" id="tree">
+      <div>
+        <div class="eyebrow">Folder tree</div>
+        <h2>A tree in the sidebar</h2>
+        <p>
+          The sidebar shows an expandable tree of your folders instead of a list of places, so you always see
+          where you are in the whole hierarchy. It is <strong>on by default</strong> on a fresh install. If you prefer
+          the classic places list, switch it off in Preferences → General → <strong>Folder Tree in Sidebar</strong>.
+        </p>
+        <ul class="plain">
+          <li>Expand and collapse folders with the arrows, or double-click them.</li>
+          <li>Drag files onto any folder in the tree to move or copy them there.</li>
+          <li>Drag the edge of the sidebar to resize it, and press <kbd>F9</kbd> to show or hide it.</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <img src="screenshots/icons.png" alt="Ammonite showing the folder tree in the sidebar" loading="lazy" width="1500" height="910">
+        <figcaption>The folder tree, with the current folder highlighted.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="compact">
+  <div class="wrap">
+    <div class="split wide">
+      <div>
+        <div class="eyebrow">Compact layout</div>
+        <h2>Columns that are only as wide as they need to be</h2>
+        <p>
+          The compact layout lists items one per line, filling each column from top to bottom before starting
+          the next. Each column is exactly as wide as its own longest name, so short names don't waste space
+          next to a long one. Many more files fit on screen, and the view scrolls sideways when there are too many.
+        </p>
+        <ul class="plain">
+          <li>Switch to it with <kbd>Ctrl</kbd>+<kbd>3</kbd>, or from the view button in the toolbar.</li>
+          <li><kbd>Ctrl</kbd>+<kbd>1</kbd> is the list view and <kbd>Ctrl</kbd>+<kbd>2</kbd> is the icon grid.</li>
+          <li>Selection, rubber-band selection, drag and drop, keyboard navigation and the context menu all work as in the other views.</li>
+          <li>Zoom changes the icon size.</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <img src="screenshots/compact.png" alt="Ammonite's compact layout, with files in columns of different widths" loading="lazy" width="1500" height="910">
+        <figcaption>Compact layout. The first column is narrower than the second.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="twopane">
+  <div class="wrap">
+    <div class="split wide">
+      <figure class="shot">
+        <img src="screenshots/twopane.png" alt="Ammonite in two-pane mode, with two different folders side by side" loading="lazy" width="1500" height="910">
+        <figcaption>Two panes, each showing its own folder.</figcaption>
+      </figure>
+      <div>
+        <div class="eyebrow">Two-pane mode</div>
+        <h2>Two folders, side by side</h2>
+        <p>
+          Press <kbd>F3</kbd> to split the current tab into two panes, and press it again to go back to one.
+          It is also in the main menu as <strong>Two Panes</strong>. The new pane opens at the same folder.
+        </p>
+        <ul class="plain">
+          <li>The pane you last clicked in or focused is the active one. The toolbar, the sidebar and keyboard shortcuts act on it.</li>
+          <li>Clicking a folder in the sidebar tree opens it in the active pane.</li>
+          <li>Each pane has its own location, history and view mode, so one can be a list and the other compact.</li>
+          <li>Drag files from one pane to the other to copy or move them.</li>
+          <li>Two-pane mode belongs to a tab. Other tabs are unaffected.</li>
+        </ul>
+        <p class="dim">The <kbd>F3</kbd> shortcut works while a file view has focus.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="scripts">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <div class="eyebrow">Scripts</div>
+        <h2>Your own actions in the right-click menu</h2>
+        <p>
+          Put an executable file in the scripts folder and it appears under <strong>Scripts</strong> in the context menu.
+          Ammonite runs it in the folder you are looking at and passes it the selected files, so a few lines of shell
+          can resize images, make backups, rename in bulk or call any tool you like.
+        </p>
+        <ul class="plain">
+          <li>Sub-folders become sub-menus.</li>
+          <li>The selection is passed as arguments and in <code>AMMONITE_SCRIPT_*</code> environment variables.</li>
+          <li>Give a script its own keyboard shortcut.</li>
+        </ul>
+        <p><a class="btn" href="scripting.html">Read the scripting documentation</a></p>
+      </div>
+      <figure class="shot">
+        <img src="screenshots/menu.png" alt="The Ammonite context menu with a Scripts entry" loading="lazy" width="1500" height="910">
+        <figcaption>The context menu with its <em>Scripts</em> entry.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="same">
+  <div class="wrap">
+    <div class="center narrow">
+      <div class="eyebrow">And everything else</div>
+      <h2>The rest of GNOME Files, kept</h2>
+      <p class="dim">The reason to fork rather than start over is that almost everything was already right.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>Four ways to look</h3><p>Icon grid, list, tree list and the new compact layout.</p></div>
+      <div class="card"><h3>Search</h3><p>Fast search and metadata through LocalSearch, locally and across the network.</p></div>
+      <div class="card"><h3>Tabs</h3><p>Browse in tabs, with a tab overview, and drag tabs out into their own windows.</p></div>
+      <div class="card"><h3>Removable media &amp; network</h3><p>Read and write to and from removable media and network locations.</p></div>
+      <div class="card"><h3>Open in Terminal</h3><p>Open a terminal in the current or selected folder, using your system's default terminal.</p></div>
+      <div class="card"><h3>Default file manager</h3><p>The Flatpak can act as your default file manager, so other apps open folders in Ammonite.</p></div>
+      <div class="card"><h3>Extensions</h3><p>Extend it through <code>libammonite-extension</code>.</p></div>
+      <div class="card"><h3>GNOME design</h3><p>GTK 4 and libadwaita, with the same adaptive layout, header bar and look as the rest of your desktop.</p></div>
+      <div class="card"><h3>Sandbox-friendly</h3><p>Builds as a Flatpak as <code>org.ammonite.Ammonite</code>, and uses Bubblewrap for thumbnailing.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="fork">
+  <div class="wrap narrow">
+    <div class="eyebrow">Honesty section</div>
+    <h2>This is a fork, and that has consequences</h2>
+    <p>
+      Ammonite is a fork of GNOME Files (Nautilus), with great respect for the people who build it.
+      Version 1.0.0 is based on Nautilus 51.0.1, which is upstream version 52.alpha. Upstream made a
+      design decision, and I'm not arguing it's wrong for everyone. I just wanted something different for me.
+    </p>
+    <table>
+      <thead><tr><th>Area</th><th>Ammonite</th></tr></thead>
+      <tbody>
+        <tr><td>Name &amp; app ID</td><td>Ammonite, <code>org.ammonite.Ammonite</code>, with its own GSettings schemas.</td></tr>
+        <tr><td>Extension API</td><td><code>libammonite-extension</code>. Extensions written for Nautilus, such as <code>nautilus-python</code> ones, are not compatible.</td></tr>
+        <tr><td>Upstream changes</td><td>Merging them requires the rename to be applied.</td></tr>
+        <tr><td>Versions</td><td><code>MAJOR.MINOR.MICRO</code> with GNOME-style pre-releases. Major bumps only for breaking changes.</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:1.6rem">
+      If you are happy with GNOME Files as it is, use it. It's excellent. Ammonite is for those of us who wanted a tree, a compact view, two panes and scripts.
+    </p>
+  </div>
+</section>
+
+<section class="alt" id="name">
+  <div class="wrap narrow center">
+    <div class="eyebrow">The name</div>
+    <h2>Why “Ammonite”?</h2>
+    <p>
+      Nautilus is a living cephalopod with a spiral shell, and the file manager takes its name from it.
+      Ammonites were its long-extinct relatives, and also spiral shells, from a time when things were
+      simpler and there were trees to climb.
+    </p>
+    <p class="dim">An older relative, for an older habit.</p>
+  </div>
+</section>
+
+<section id="try">
+  <div class="wrap narrow">
+    <div class="eyebrow">Get it</div>
+    <h2>Build the Flatpak</h2>
+    <p>The manifest builds from your checkout and needs the GNOME Nightly runtime (<code>org.gnome.Platform//master</code>).</p>
+<pre><code>flatpak run org.flatpak.Builder --user --install --force-clean \
+  build-dir build-aux/flatpak/org.ammonite.Ammonite.json
+flatpak run org.ammonite.Ammonite.Devel</code></pre>
+    <p>The folder tree is on by default. You can turn it off in Preferences → General → <strong>Folder Tree in Sidebar</strong>.</p>
+    <p class="dim">
+      Runtime dependencies: Bubblewrap, LocalSearch (with all features enabled) and xdg-user-dirs-gtk.
+      Licensed GPL-3.0-or-later.
+    </p>
+  </div>
+</section>
+
+<section class="alt" id="thanks">
+  <div class="wrap narrow thanks">
+    <div class="eyebrow">Thank you</div>
+    <h2>Credit where it's due</h2>
+    <p>
+      The Caja-style <strong>compact layout</strong> and <strong>scripting</strong> came from a suggestion by
+      <a href="https://x.com/vermaden">@vermaden</a> on X. Thank you.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <p><strong>Ammonite</strong></p>
+        <p>A fork of GNOME Files with a folder tree.</p>
+        <p><a href="scripting.html">Scripting documentation</a></p>
+        <p>Made by <a href="https://x.com/rwdcameron">Ross WD Cameron</a> (@rwdcameron).</p>
+      </div>
+      <div>
+        <p>© 2026 Ross WD Cameron. Licensed under GPL-3.0-or-later.</p>
+        <p>Not affiliated with or endorsed by the GNOME Project. GNOME is a trademark of the GNOME Foundation.</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2000 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  *
@@ -7,6 +8,8 @@
  */
 
 #include "ammonite-properties.h"
+#include "ammonite-app-chooser.h"
+#include "ammonite-sharing-page.h"
 
 #include <adwaita.h>
 #include <gio/gunixmounts.h>
@@ -116,6 +119,10 @@ struct _AmmonitePropertiesWidget
     GtkWidget *created_row;
     GtkWidget *accessed_row;
 
+    GtkWidget *default_app_row;
+    GtkWidget *sharing_row;
+    GtkWidget *sharing_page;
+    GtkWidget *default_app_value_label;
     GtkWidget *permissions_navigation_row;
     GtkWidget *permissions_value_label;
 
@@ -478,6 +485,84 @@ static AmmoniteFile *
 get_file (AmmonitePropertiesWidget *self)
 {
     return AMMONITE_FILE (self->files->data);
+}
+
+static gboolean
+should_show_default_app_row (AmmonitePropertiesWidget *self)
+{
+    return !is_multi_file_window (self) &&
+           !ammonite_file_is_directory (get_file (self));
+}
+
+static void
+update_default_app_row (AmmonitePropertiesWidget *self)
+{
+    const char *mime_type = ammonite_file_get_mime_type (get_file (self));
+    g_autoptr (GAppInfo) info = mime_type != NULL ? g_app_info_get_default_for_type (mime_type, FALSE) : NULL;
+
+    gtk_label_set_text (GTK_LABEL (self->default_app_value_label),
+                        info != NULL ? g_app_info_get_display_name (info) : _("None"));
+}
+
+static void
+on_default_app_chosen (AdwDialog               *dialog,
+                       GAppInfo                *info,
+                       AmmonitePropertiesWidget *self)
+{
+    update_default_app_row (self);
+    adw_dialog_close (dialog);
+}
+
+static void
+on_default_app_row_activated (AmmonitePropertiesWidget *self)
+{
+    AmmoniteAppChooser *dialog = ammonite_app_chooser_new (self->files);
+
+    ammonite_app_chooser_set_default_only (dialog);
+    g_signal_connect_object (dialog, "app-chosen",
+                             G_CALLBACK (on_default_app_chosen),
+                             self, G_CONNECT_DEFAULT);
+    adw_dialog_present (ADW_DIALOG (dialog), GTK_WIDGET (self));
+}
+
+static char *
+get_sharing_path (AmmonitePropertiesWidget *self)
+{
+    AmmoniteFile *file;
+    g_autoptr (GFile) location = NULL;
+
+    if (is_multi_file_window (self))
+    {
+        return NULL;
+    }
+
+    file = get_file (self);
+    if (!ammonite_file_is_directory (file))
+    {
+        return NULL;
+    }
+
+    location = g_object_ref (ammonite_file_get_location (file));
+    return g_file_get_path (location);
+}
+
+static void
+on_sharing_row_activated (AmmonitePropertiesWidget *self)
+{
+    if (self->sharing_page == NULL)
+    {
+        g_autofree char *path = get_sharing_path (self);
+
+        if (path == NULL)
+        {
+            return;
+        }
+
+        self->sharing_page = GTK_WIDGET (ammonite_sharing_page_new (path));
+        adw_navigation_view_add (self->nav_view, ADW_NAVIGATION_PAGE (self->sharing_page));
+    }
+
+    adw_navigation_view_push_by_tag (self->nav_view, "sharing");
 }
 
 static void
@@ -3616,6 +3701,21 @@ setup_properties_widget (AmmonitePropertiesWidget *self)
     /* Create the pages. */
     setup_basic_page (self);
 
+    if (should_show_default_app_row (self))
+    {
+        update_default_app_row (self);
+        gtk_widget_set_visible (self->default_app_row, TRUE);
+    }
+
+    {
+        g_autofree char *sharing_path = get_sharing_path (self);
+
+        if (sharing_path != NULL)
+        {
+            gtk_widget_set_visible (self->sharing_row, TRUE);
+        }
+    }
+
     if (should_show_permissions (self))
     {
         setup_permissions_page (self);
@@ -4057,6 +4157,9 @@ ammonite_properties_widget_class_init (AmmonitePropertiesWidgetClass *klass)
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, modified_row);
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, created_row);
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, accessed_row);
+    gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, default_app_row);
+    gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, sharing_row);
+    gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, default_app_value_label);
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, permissions_navigation_row);
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, permissions_value_label);
     gtk_widget_class_bind_template_child (widget_class, AmmonitePropertiesWidget, extension_models_group);
@@ -4088,6 +4191,8 @@ ammonite_properties_widget_class_init (AmmonitePropertiesWidgetClass *klass)
     gtk_widget_class_bind_template_callback (widget_class, open_parent_folder);
     gtk_widget_class_bind_template_callback (widget_class, open_link_target);
     gtk_widget_class_bind_template_callback (widget_class, navigate_permissions_page);
+    gtk_widget_class_bind_template_callback (widget_class, on_default_app_row_activated);
+    gtk_widget_class_bind_template_callback (widget_class, on_sharing_row_activated);
     gtk_widget_class_bind_template_callback (widget_class, reset_icon);
     gtk_widget_class_bind_template_callback (widget_class, select_image_button_callback);
     gtk_widget_class_bind_template_callback (widget_class, on_change_permissions_clicked);

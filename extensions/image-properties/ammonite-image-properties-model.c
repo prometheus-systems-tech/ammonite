@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2004 Red Hat, Inc.
  * SPDX-FileCopyrightText: 2007 Novell, Inc.
  * SPDX-FileCopyrightText: 2017 Thomas Bechtold <thomasbechtold@jpberlin.de>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *

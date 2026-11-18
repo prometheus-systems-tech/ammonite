@@ -2,6 +2,7 @@
  * ammonite-file-info.h - Information about a file
  *
  * SPDX-FileCopyrightText: 2003 Novell, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */

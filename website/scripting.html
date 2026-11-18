@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scripting — Ammonite documentation</title>
+<meta name="description" content="How scripts work in Ammonite: where they live, how they are run, which arguments and environment variables they get, keyboard shortcuts, examples and moving over from Caja.">
+<link rel="icon" href="ammonite.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="index.html"><img src="ammonite.svg" alt="">Ammonite</a>
+    <ul>
+      <li><a href="index.html#story">The story</a></li>
+      <li><a href="index.html#features">Features</a></li>
+      <li><a href="scripting.html" aria-current="page">Scripting</a></li>
+      <li><a href="index.html#fork">The fork</a></li>
+      <li><a href="index.html#try">Try it</a></li>
+    </ul>
+  </div>
+</nav>
+
+<section style="padding-top:3.1rem">
+  <div class="wrap narrow">
+    <div class="eyebrow">Documentation</div>
+    <h1 style="font-size:clamp(2rem,5vw,3rem);line-height:1.15;margin:0 0 0.9rem;font-weight:800">Scripting</h1>
+    <p class="dim">
+      Scripts add your own actions to Ammonite's right-click menu. A script is just an executable file in a folder:
+      write it in shell, Python or anything else you can run, and Ammonite hands it the files you have selected.
+    </p>
+
+    <div class="toc">
+      <strong>On this page</strong>
+      <ol>
+        <li><a href="#quickstart">Quick start</a></li>
+        <li><a href="#folder">The scripts folder</a></li>
+        <li><a href="#menu">How scripts appear in the menu</a></li>
+        <li><a href="#running">How a script is run</a></li>
+        <li><a href="#args">Arguments</a></li>
+        <li><a href="#env">Environment variables</a></li>
+        <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+        <li><a href="#output">Output and errors</a></li>
+        <li><a href="#flatpak">Running under Flatpak</a></li>
+        <li><a href="#examples">Examples</a></li>
+        <li><a href="#caja">Coming from Caja or Nautilus</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+        <li><a href="#thanks">Thanks</a></li>
+      </ol>
+    </div>
+
+    <figure class="shot" style="margin-top:1.8rem">
+      <img src="screenshots/menu.png" alt="The Ammonite context menu, with the Scripts entry below Set Default Application" width="1500" height="910">
+      <figcaption>The <em>Scripts</em> entry in the context menu.</figcaption>
+    </figure>
+
+    <h3 class="doc" id="quickstart">1. Quick start</h3>
+    <ol>
+      <li>Right-click a file, choose <strong>Scripts → Open Scripts Folder</strong>. (Or open the folder from a terminal. Its path is below.)</li>
+      <li>Create a file there called <code>Make backup copy</code> with these contents:
+<pre><code>#!/bin/bash
+for f in "$@"; do
+  cp -- "$f" "$f.bak"
+done</code></pre>
+      </li>
+      <li>Make it executable:
+<pre><code>chmod +x "Make backup copy"</code></pre>
+      </li>
+      <li>Select some files, right-click, and choose <strong>Scripts → Make backup copy</strong>. Each selected file now has a <code>.bak</code> sibling.</li>
+    </ol>
+    <p>The menu updates by itself when you add, remove or rename scripts. There is no need to restart Ammonite.</p>
+
+    <h3 class="doc" id="folder">2. The scripts folder</h3>
+    <table>
+      <thead><tr><th>How you run Ammonite</th><th>Scripts folder</th></tr></thead>
+      <tbody>
+        <tr><td>Flatpak</td><td><code>~/.local/share/ammonite/scripts</code></td></tr>
+        <tr><td>Installed normally</td><td><code>$XDG_DATA_HOME/ammonite/scripts</code>, which is normally <code>~/.local/share/ammonite/scripts</code></td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:0.9rem">
+      The folder is created for you. It is separate from Nautilus' <code>~/.local/share/nautilus/scripts</code> and Caja's
+      <code>~/.config/caja/scripts</code>, so nothing is picked up from those automatically. See <a href="#caja">Coming from Caja</a>.
+    </p>
+
+    <h3 class="doc" id="menu">3. How scripts appear in the menu</h3>
+    <ul class="plain">
+      <li><strong>Only executable files are listed.</strong> A file that is not executable is ignored, so <code>chmod +x</code> your script.</li>
+      <li><strong>The menu entry is the file name</strong>, exactly as written. <code>Make backup copy</code> shows as <em>Make backup copy</em>. Pick a name that reads well as a menu item, and don't add an extension unless you want it shown.</li>
+      <li><strong>Entries are sorted</strong> by name. Prefix names with numbers (<code>10 Resize</code>, <code>20 Backup</code>) to control the order.</li>
+      <li><strong>Sub-folders become sub-menus.</strong> A folder called <code>Images</code> containing <code>Resize to 50%</code> gives you <em>Scripts → Images → Resize to 50%</em>, to any depth. A folder with no usable scripts inside it is left out.</li>
+      <li><strong>Hidden files and folders</strong> (names starting with a dot) are not shown. Use that for helper files your scripts share.</li>
+      <li><strong>At most 30 entries are listed per folder.</strong> Use sub-folders to organise anything larger.</li>
+      <li>The <strong>Scripts</strong> entry is in the context menu of a selection in normal folder views. Its last item, <em>Open Scripts Folder</em>, is always there.</li>
+    </ul>
+
+    <h3 class="doc" id="running">4. How a script is run</h3>
+    <ul class="plain">
+      <li>The script is started directly, so it needs a valid first line such as <code>#!/bin/bash</code> or <code>#!/usr/bin/env python3</code>.</li>
+      <li>Its <strong>working directory is the folder you are viewing</strong>, as long as that folder is on a local disk. That is why file names are passed as short, relative names.</li>
+      <li>The selection is passed to the script at the moment you click the menu item.</li>
+      <li>Ammonite does not wait for the script, and does not show a terminal window for it. Your file manager stays responsive while it runs.</li>
+      <li>Scripts are offered for selected items, so select at least one file or folder first. The <em>Scripts</em> entry is in the right-click menu of a selection, not in the menu of an empty area.</li>
+    </ul>
+
+    <h3 class="doc" id="args">5. Arguments</h3>
+    <p>The selected files are passed as command-line arguments, one per file, in the order Ammonite lists them.</p>
+    <table>
+      <thead><tr><th>Situation</th><th>What the arguments look like</th></tr></thead>
+      <tbody>
+        <tr><td>Selected file is inside the folder you are viewing</td><td>The bare name, for example <code>photo-001.jpg</code></td></tr>
+        <tr><td>Selected file is somewhere else, for example in search results</td><td>The full path, for example <code>/home/you/Pictures/photo-001.jpg</code></td></tr>
+        <tr><td>Any selected item is not a local file (network share, trash, recent files…)</td><td><strong>No arguments at all</strong>. Use the environment variables instead, which carry URIs.</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <p>Always quote <code>"$@"</code> and each file variable (<code>"$f"</code>). File names can contain spaces, quotes and other characters that would otherwise be split by the shell.</p>
+    </div>
+
+    <h3 class="doc" id="env">6. Environment variables</h3>
+    <p>Ammonite sets three environment variables for the script. They are only set while the script is being started, and are not present anywhere else.</p>
+    <table>
+      <thead><tr><th>Variable</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>AMMONITE_SCRIPT_SELECTED_FILE_PATHS</code></td>
+          <td>The selected files as full local paths, <strong>separated by newlines</strong>, with a newline after the last one. If any selected item is not a local file, this is an empty string.</td>
+        </tr>
+        <tr>
+          <td><code>AMMONITE_SCRIPT_SELECTED_URIS</code></td>
+          <td>The selected files as URIs, separated by newlines. This works for every kind of location, local or remote.</td>
+        </tr>
+        <tr>
+          <td><code>AMMONITE_SCRIPT_CURRENT_URI</code></td>
+          <td>The URI of the folder being viewed, for example <code>file:///home/you/Documents</code> or <code>smb://server/share</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:0.9rem">Because paths are separated by newlines, read them line by line. In bash:</p>
+<pre><code>while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  echo "Selected: $path"
+done &lt;&lt;&lt; "$AMMONITE_SCRIPT_SELECTED_FILE_PATHS"</code></pre>
+    <p>A file name that itself contains a newline cannot be represented this way. Use the arguments for those.</p>
+    <p>
+      For locations that are not local (a network share, say), work from the URIs with tools that understand them, such as <code>gio copy</code>, <code>gio cat</code> and <code>gio open</code>.
+    </p>
+
+    <h3 class="doc" id="shortcuts">7. Keyboard shortcuts</h3>
+    <p>
+      A script can be given its own shortcut. Create the file <code>scripts-accels</code> in Ammonite's configuration folder
+      and add one line per shortcut, in the form <code>ACCELERATOR script name</code>:
+    </p>
+<pre><code># ~/.config/ammonite/scripts-accels
+&lt;Control&gt;F5 Make backup copy
+&lt;Alt&gt;r Resize to 50%</code></pre>
+    <ul class="plain">
+      <li>The accelerator is everything before the <strong>first space</strong>. It uses GTK's syntax: modifiers in angle brackets (<code>&lt;Control&gt;</code>, <code>&lt;Shift&gt;</code>, <code>&lt;Alt&gt;</code>) followed by a key name.</li>
+      <li>Everything after the first space is the script's <strong>file name</strong>, which may contain spaces. It is matched by name only, so scripts in sub-folders work too. Don't include the folder.</li>
+      <li>Both parts are cut off at 100 characters.</li>
+      <li>Lines that don't have both parts are ignored.</li>
+      <li>The file is read when Ammonite starts, so restart Ammonite after editing it.</li>
+      <li>The shortcut acts on the current selection, exactly like the menu item.</li>
+    </ul>
+    <p>Under Flatpak the file is <code>~/.var/app/org.ammonite.Ammonite/config/ammonite/scripts-accels</code>.</p>
+
+    <h3 class="doc" id="output">8. Output and errors</h3>
+    <ul class="plain">
+      <li>Ammonite does not open a terminal, and it does not collect the script's output or exit status. Anything it prints is not shown.</li>
+      <li>To tell the user something, use a desktop tool: <code>notify-send "Done"</code> for a notification, or <code>zenity --info --text="…"</code> / <code>zenity --text-info</code> for a dialog.</li>
+      <li>To keep a record, write to a log file: <code>exec &gt;&gt; ~/ammonite-script.log 2&gt;&amp;1</code> near the top of the script.</li>
+      <li>If you need a terminal (to ask a question, say), start one yourself: <code>exec gnome-terminal -- bash -c '…'</code>.</li>
+      <li>While you write a script, run it by hand from a terminal first, with the same arguments, until it works.</li>
+    </ul>
+
+    <h3 class="doc" id="flatpak">9. Running under Flatpak</h3>
+    <p>
+      The Flatpak build can see your files (it has access to your home folder and other disks), and it reads the same scripts folder.
+      However, <strong>scripts run inside Ammonite's sandbox</strong>. They can use the tools that are installed in the Flatpak runtime
+      (<code>bash</code>, <code>cp</code>, <code>mv</code>, <code>find</code>, <code>python3</code> …), but not programs that are installed only on
+      your host system, such as ImageMagick or <code>ffmpeg</code>.
+    </p>
+    <p>If a script needs a host tool, either install the Ammonite package natively, or have the script call the tool through a Flatpak that provides it.</p>
+
+    <h3 class="doc" id="examples">10. Examples</h3>
+
+    <p><strong>Copy the paths of the selected files to the clipboard</strong> (needs <code>wl-copy</code> on Wayland, or <code>xclip</code> on X11):</p>
+<pre><code>#!/bin/bash
+printf '%s' "$AMMONITE_SCRIPT_SELECTED_FILE_PATHS" | wl-copy</code></pre>
+
+    <p><strong>Show what Ammonite passes to a script</strong>, which is useful when you are developing your own:</p>
+<pre><code>#!/bin/bash
+{
+  echo "Current folder: $AMMONITE_SCRIPT_CURRENT_URI"
+  echo
+  echo "Selected paths:"
+  echo "$AMMONITE_SCRIPT_SELECTED_FILE_PATHS"
+  echo
+  echo "Arguments: $#"
+} | zenity --text-info --title="Script environment"</code></pre>
+
+    <p><strong>Resize images to half size</strong>, saved beside the originals. Put this in a sub-folder called <code>Images</code> (needs ImageMagick):</p>
+<pre><code>#!/bin/bash
+for f in "$@"; do
+  convert "$f" -resize 50% "${f%.*}-small.${f##*.}"
+done
+notify-send "Resized $# image(s)"</code></pre>
+
+    <p><strong>Make a zip of the selection</strong> named after the folder you are in:</p>
+<pre><code>#!/bin/bash
+[ $# -gt 0 ] || { notify-send "Select something first"; exit 1; }
+zip -r "../$(basename "$PWD").zip" -- "$@"
+notify-send "Zip created" "$(basename "$PWD").zip"</code></pre>
+
+    <p><strong>A Python script</strong> that counts lines in the selected text files:</p>
+<pre><code>#!/usr/bin/env python3
+import subprocess, sys
+
+total = 0
+for name in sys.argv[1:]:
+    try:
+        with open(name, errors="replace") as f:
+            total += sum(1 for _ in f)
+    except OSError:
+        pass
+subprocess.run(["notify-send", "Line count", str(total)])</code></pre>
+
+    <h3 class="doc" id="caja">11. Coming from Caja or Nautilus</h3>
+    <p>
+      Ammonite's scripts follow the same model as Caja's and Nautilus', so most scripts work unchanged. To move yours over:
+    </p>
+    <ol>
+      <li>Copy the scripts, keeping any sub-folders, into Ammonite's scripts folder. For Caja that is <code>~/.config/caja/scripts</code>, and for Nautilus <code>~/.local/share/nautilus/scripts</code>.</li>
+      <li>Rename the environment variables the scripts use:
+        <table>
+          <thead><tr><th>Caja</th><th>Nautilus</th><th>Ammonite</th></tr></thead>
+          <tbody>
+            <tr><td><code>CAJA_SCRIPT_SELECTED_FILE_PATHS</code></td><td><code>NAUTILUS_SCRIPT_SELECTED_FILE_PATHS</code></td><td><code>AMMONITE_SCRIPT_SELECTED_FILE_PATHS</code></td></tr>
+            <tr><td><code>CAJA_SCRIPT_SELECTED_URIS</code></td><td><code>NAUTILUS_SCRIPT_SELECTED_URIS</code></td><td><code>AMMONITE_SCRIPT_SELECTED_URIS</code></td></tr>
+            <tr><td><code>CAJA_SCRIPT_CURRENT_URI</code></td><td><code>NAUTILUS_SCRIPT_CURRENT_URI</code></td><td><code>AMMONITE_SCRIPT_CURRENT_URI</code></td></tr>
+          </tbody>
+        </table>
+        A one-line fix for a whole folder: <code>sed -i 's/CAJA_SCRIPT_/AMMONITE_SCRIPT_/g; s/NAUTILUS_SCRIPT_/AMMONITE_SCRIPT_/g' *</code>
+      </li>
+      <li>Ammonite does not provide Caja's window-geometry variable, or its variables for the other pane in two-pane mode. A script that relies on them needs adapting.</li>
+      <li>Shortcuts move too, but the file is Ammonite's <code>scripts-accels</code>. See <a href="#shortcuts">Keyboard shortcuts</a>.</li>
+    </ol>
+
+    <h3 class="doc" id="troubleshooting">12. Troubleshooting</h3>
+    <table>
+      <thead><tr><th>Problem</th><th>Check</th></tr></thead>
+      <tbody>
+        <tr><td>The script doesn't appear</td><td>Is it executable (<code>chmod +x</code>)? Is it directly in the scripts folder, or in a sub-folder that has at least one usable script? Is its name free of a leading dot? Are there more than 30 entries in that folder?</td></tr>
+        <tr><td>Nothing seems to happen</td><td>The output is not shown. Run the script in a terminal with the same arguments, or add logging as described under <a href="#output">Output and errors</a>.</td></tr>
+        <tr><td>"Exec format error"</td><td>The first line is missing or wrong. Start the file with <code>#!/bin/bash</code> or another interpreter.</td></tr>
+        <tr><td>The script gets no arguments</td><td>One of the selected items is not a local file. Read <code>AMMONITE_SCRIPT_SELECTED_URIS</code> instead.</td></tr>
+        <tr><td>Files with spaces break</td><td>Quote every variable: <code>"$f"</code>, <code>"$@"</code>.</td></tr>
+        <tr><td>A command is "not found" (Flatpak)</td><td>Scripts run inside the sandbox. See <a href="#flatpak">Running under Flatpak</a>.</td></tr>
+        <tr><td>The shortcut doesn't work</td><td>The name after the accelerator must match the script's file name exactly, and Ammonite must be restarted after editing <code>scripts-accels</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="doc" id="thanks">13. Thanks</h3>
+    <p>
+      Scripting, along with the Caja-style compact layout, was suggested by <a href="https://x.com/vermaden">@vermaden</a> on X. Thank you.
+    </p>
+    <p><a class="btn alt" href="index.html#features">Back to the features</a></p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <p><strong>Ammonite</strong></p>
+        <p>A fork of GNOME Files with a folder tree.</p>
+        <p>Made by <a href="https://x.com/rwdcameron">Ross WD Cameron</a> (@rwdcameron).</p>
+      </div>
+      <div>
+        <p>© 2026 Ross WD Cameron. Licensed under GPL-3.0-or-later.</p>
+        <p>Not affiliated with or endorsed by the GNOME Project. GNOME is a trademark of the GNOME Foundation.</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

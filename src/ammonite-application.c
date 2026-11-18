@@ -4,6 +4,7 @@
  * SPDX-FileCopyrightText: 1999, 2000 Red Hat, Inc.
  * SPDX-FileCopyrightText: 2000, 2001 Eazel, Inc.
  * SPDX-FileCopyrightText: 2010, Cosimo Cecchi <cosimoc@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -983,6 +984,105 @@ icon_theme_changed_callback (GtkIconTheme *icon_theme,
     emit_change_signals_for_all_files_in_all_directories ();
 }
 
+/* GLib ignores desktop files whose Exec or TryExec is an absolute path that
+ * does not exist, which is the case for almost every host app inside the
+ * sandbox (/usr/bin/vlc, /usr/bin/flatpak, ...). Mirror those files into the
+ * private data directory with the command reduced to its name, which the
+ * host bin directory on PATH can resolve, so that they show up in app lists. */
+static void
+rewrite_exec_key (GKeyFile   *keyfile,
+                  const char *key,
+                  gboolean   *changed)
+{
+    g_autofree char *value = g_key_file_get_string (keyfile, G_KEY_FILE_DESKTOP_GROUP, key, NULL);
+    g_autofree char *command = NULL;
+    const char *rest;
+    g_autofree char *rewritten = NULL;
+    g_autofree char *basename = NULL;
+
+    if (value == NULL || value[0] != '/')
+    {
+        return;
+    }
+
+    rest = strchr (value, ' ');
+    command = rest != NULL ? g_strndup (value, rest - value) : g_strdup (value);
+    if (g_file_test (command, G_FILE_TEST_IS_EXECUTABLE))
+    {
+        return;
+    }
+
+    basename = g_path_get_basename (command);
+    rewritten = g_strconcat (basename, rest != NULL ? rest : "", NULL);
+    g_key_file_set_string (keyfile, G_KEY_FILE_DESKTOP_GROUP, key, rewritten);
+    *changed = TRUE;
+}
+
+static void
+mirror_host_applications (void)
+{
+    g_autofree char *host_user_apps = g_build_filename (g_get_home_dir (), ".local", "share",
+                                                       "applications", NULL);
+    g_autofree char *host_user_flatpaks = g_build_filename (g_get_home_dir (), ".local", "share",
+                                                           "flatpak", "exports", "share",
+                                                           "applications", NULL);
+    g_autofree char *target_dir = g_build_filename (g_get_user_data_dir (), "applications", NULL);
+    const char *sources[] =
+    {
+        "/run/host/usr/share/applications",
+        "/var/lib/flatpak/exports/share/applications",
+        host_user_flatpaks,
+        host_user_apps,
+        NULL
+    };
+
+    g_mkdir_with_parents (target_dir, 0700);
+
+    for (guint i = 0; sources[i] != NULL; i++)
+    {
+        g_autoptr (GDir) dir = g_dir_open (sources[i], 0, NULL);
+        const char *name;
+
+        while (dir != NULL && (name = g_dir_read_name (dir)) != NULL)
+        {
+            g_autoptr (GKeyFile) keyfile = g_key_file_new ();
+            g_autofree char *source_path = NULL;
+            g_autofree char *target_path = NULL;
+            g_autofree char *data = NULL;
+            g_autofree char *existing = NULL;
+            gboolean changed = FALSE;
+            gsize length;
+
+            if (!g_str_has_suffix (name, ".desktop"))
+            {
+                continue;
+            }
+
+            source_path = g_build_filename (sources[i], name, NULL);
+            if (!g_key_file_load_from_file (keyfile, source_path, G_KEY_FILE_KEEP_TRANSLATIONS, NULL))
+            {
+                continue;
+            }
+
+            rewrite_exec_key (keyfile, G_KEY_FILE_DESKTOP_KEY_EXEC, &changed);
+            rewrite_exec_key (keyfile, G_KEY_FILE_DESKTOP_KEY_TRY_EXEC, &changed);
+            if (!changed)
+            {
+                continue;
+            }
+
+            target_path = g_build_filename (target_dir, name, NULL);
+            data = g_key_file_to_data (keyfile, &length, NULL);
+            if (g_file_get_contents (target_path, &existing, NULL, NULL) &&
+                g_strcmp0 (existing, data) == 0)
+            {
+                continue;
+            }
+            g_file_set_contents (target_path, data, length, NULL);
+        }
+    }
+}
+
 static void
 ammonite_application_identify_to_portal (GApplication *app)
 {
@@ -1024,6 +1124,10 @@ ammonite_application_startup (GApplication *app)
     if (!ammonite_application_is_sandboxed ())
     {
         ammonite_application_identify_to_portal (app);
+    }
+    else
+    {
+        mirror_host_applications ();
     }
 
     /* Initialize GDK display (for wayland-x11-interop protocol) before GTK does

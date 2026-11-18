@@ -33,11 +33,11 @@
       </description>
     </release>
   </releases>
-  <project_group>GNOME</project_group>
   <project_license>GPL-3.0-or-later</project_license>
-  <developer id="org.gnome">
-    <name>The GNOME Project</name>
+  <developer id="org.ammonite">
+    <name>Ross WD Cameron</name>
   </developer>
+  <update_contact>rwd.cameron_at_prometheus-systems.co.za</update_contact>
   <provides>
     <binary>ammonite</binary>
     <library>libammonite-extension.so.4</library>

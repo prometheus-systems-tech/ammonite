@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ */
+
 using Gtk 4.0;
 using Adw 1;
 
@@ -499,6 +503,27 @@ template $AmmonitePropertiesWidget: Adw.Bin {
             }
 
             Adw.PreferencesGroup {
+              Adw.ActionRow default_app_row {
+                visible: false;
+                activatable: true;
+                selectable: false;
+                title: _("Default _Application");
+                use-underline: true;
+                activated => $on_default_app_row_activated(template);
+
+                Label default_app_value_label {
+                  ellipsize: end;
+
+                  styles [
+                    "dimmed",
+                  ]
+                }
+
+                Image {
+                  icon-name: "go-next-symbolic";
+                }
+              }
+
               Adw.ActionRow permissions_navigation_row {
                 activatable: true;
                 selectable: false;
@@ -513,6 +538,19 @@ template $AmmonitePropertiesWidget: Adw.Bin {
                     "dimmed",
                   ]
                 }
+
+                Image {
+                  icon-name: "go-next-symbolic";
+                }
+              }
+
+              Adw.ActionRow sharing_row {
+                visible: false;
+                activatable: true;
+                selectable: false;
+                title: _("_Sharing");
+                use-underline: true;
+                activated => $on_sharing_row_activated(template);
 
                 Image {
                   icon-name: "go-next-symbolic";

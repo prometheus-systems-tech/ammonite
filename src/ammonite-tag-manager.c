@@ -1,6 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 2017 Alexandru Pandelea <alexandru.pandelea@gmail.com>
  * SPDX-FileCopyrightText: 2020 Sam Thursfield <sam@afuera.me.uk>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */

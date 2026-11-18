@@ -3,6 +3,7 @@
  * a virtual directory consisting of the search directory and the search icons
  *
  * SPDX-FileCopyrightText: 2005 Novell, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  */

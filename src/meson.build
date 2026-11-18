@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 subdir('resources')
 
 # Desktop Portal D-Bus interfaces
@@ -137,6 +139,10 @@ libammonite_sources = [
   'ammonite-freedesktop-dbus.h',
   'ammonite-global-preferences.c',
   'ammonite-global-preferences.h',
+  'ammonite-compact-cell.c',
+  'ammonite-compact-cell.h',
+  'ammonite-compact-view.c',
+  'ammonite-compact-view.h',
   'ammonite-grid-cell.c',
   'ammonite-grid-cell.h',
   'ammonite-grid-view.c',
@@ -215,6 +221,8 @@ libammonite_sources = [
   'ammonite-progress-paintable.h',
   'ammonite-progress-persistence-handler.c',
   'ammonite-progress-persistence-handler.h',
+  'ammonite-sharing-page.c',
+  'ammonite-sharing-page.h',
   'ammonite-properties.c',
   'ammonite-properties.h',
   'ammonite-query.c',

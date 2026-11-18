@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ */
+
 #include <glib.h>
 
 #include <ammonite-filename-utilities.h>

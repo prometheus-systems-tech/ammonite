@@ -1,6 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 1999, 2000, 2004 Red Hat, Inc.
  * SPDX-FileCopyrightText: 1999, 2000, 2001 Eazel, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
@@ -1143,6 +1144,95 @@ extra_drag_drop_cb (AdwTabBar    *self,
     return ammonite_dnd_perform_drop (view, value, action, target_location);
 }
 
+/* In two-pane mode the secondary slot is not a tab page itself; return the
+ * slot that is. */
+static AmmoniteWindowSlot *
+get_tab_slot (AmmoniteWindowSlot *slot)
+{
+    GtkWidget *parent = gtk_widget_get_parent (GTK_WIDGET (slot));
+    GtkWidget *ancestor = parent != NULL ? gtk_widget_get_ancestor (parent, AMMONITE_TYPE_WINDOW_SLOT) : NULL;
+
+    return ancestor != NULL ? AMMONITE_WINDOW_SLOT (ancestor) : slot;
+}
+
+static void
+on_pane_focus_enter (GtkEventControllerFocus *controller,
+                     gpointer                 user_data)
+{
+    AmmoniteWindowSlot *slot = user_data;
+    AmmoniteWindow *window = AMMONITE_WINDOW (gtk_widget_get_ancestor (GTK_WIDGET (slot), AMMONITE_TYPE_WINDOW));
+
+    if (window != NULL)
+    {
+        set_active_slot (window, slot);
+    }
+}
+
+static void
+watch_pane_focus (AmmoniteWindowSlot *slot)
+{
+    GtkWidget *pane = ammonite_window_slot_get_pane_widget (slot);
+    GtkEventController *controller;
+
+    if (g_object_get_data (G_OBJECT (pane), "ammonite-pane-focus") != NULL)
+    {
+        return;
+    }
+    g_object_set_data (G_OBJECT (pane), "ammonite-pane-focus", GINT_TO_POINTER (1));
+
+    controller = gtk_event_controller_focus_new ();
+    g_signal_connect (controller, "enter", G_CALLBACK (on_pane_focus_enter), slot);
+    gtk_widget_add_controller (pane, controller);
+}
+
+static void
+action_toggle_two_pane (GSimpleAction *action,
+                        GVariant      *parameter,
+                        gpointer       user_data)
+{
+    AmmoniteWindow *window = user_data;
+    AmmoniteWindowSlot *primary;
+    AmmoniteWindowSlot *secondary;
+
+    if (window->active_slot == NULL)
+    {
+        return;
+    }
+
+    primary = get_tab_slot (window->active_slot);
+    secondary = ammonite_window_slot_get_secondary (primary);
+
+    if (secondary == NULL)
+    {
+        GFile *location = ammonite_window_slot_get_location (primary);
+
+        secondary = ammonite_window_slot_new (AMMONITE_MODE_BROWSE);
+        g_signal_connect_swapped (secondary, "notify::allow-stop",
+                                  G_CALLBACK (update_cursor), window);
+        g_signal_connect (secondary, "notify::location",
+                          G_CALLBACK (on_slot_location_changed), window);
+        ammonite_window_slot_set_secondary (primary, secondary);
+        g_object_unref (secondary);
+
+        watch_pane_focus (primary);
+        watch_pane_focus (secondary);
+
+        if (location != NULL)
+        {
+            ammonite_window_slot_open_location_full (secondary, location, NULL);
+        }
+        set_active_slot (window, secondary);
+        gtk_widget_grab_focus (GTK_WIDGET (secondary));
+    }
+    else
+    {
+        set_active_slot (window, primary);
+        disconnect_slot (window, secondary);
+        ammonite_window_slot_set_secondary (primary, NULL);
+        gtk_widget_grab_focus (GTK_WIDGET (primary));
+    }
+}
+
 static const GActionEntry win_entries[] =
 {
     { .name = "current-location-menu", .activate = action_show_current_location_menu },
@@ -1160,6 +1250,7 @@ static const GActionEntry win_entries[] =
     { .name = "go-to-tab", .parameter_type = "i", .state = "0", .change_state = action_go_to_tab },
     { .name = "restore-tab", .activate = action_restore_tab },
     { .name = "toggle-sidebar", .activate = action_toggle_sidebar },
+    { .name = "toggle-two-pane", .activate = action_toggle_two_pane },
 };
 
 static void
@@ -1188,6 +1279,7 @@ ammonite_window_initialize_actions (AmmoniteWindow *window)
     ammonite_application_set_accelerator (app, "win.current-location-menu", "F10");
     ammonite_application_set_accelerator (app, "win.restore-tab", "<shift><control>t");
     ammonite_application_set_accelerator (app, "win.toggle-sidebar", "F9");
+    ammonite_application_set_accelerator (app, "win.toggle-two-pane", "F3");
 
     /* Alt+N for the first 9 tabs */
     for (i = 0; i < 9; ++i)
@@ -1404,7 +1496,7 @@ set_active_slot (AmmoniteWindow     *window,
     if (new_slot)
     {
         AdwTabPage *page = adw_tab_view_get_page (window->tab_view,
-                                                  GTK_WIDGET (new_slot));
+                                                  GTK_WIDGET (get_tab_slot (new_slot)));
         adw_tab_view_set_selected_page (window->tab_view, page);
 
         /* inform slot & view */
@@ -1753,17 +1845,20 @@ ammonite_window_show_about_dialog (AmmoniteWindow *window)
 
     const gchar *designers[] =
     {
-        _("The GNOME Project"),
+        "Ross WD Cameron",
+        _("The Nautilus designers"),
         NULL
     };
     const gchar *developers[] =
     {
-        _("The GNOME Project"),
+        "Ross WD Cameron https://x.com/rwdcameron",
+        _("The Nautilus developers"),
         NULL
     };
     const gchar *documenters[] =
     {
-        _("The GNOME Project"),
+        "Ross WD Cameron",
+        _("The Nautilus documenters"),
         "Sun Microsystems",
         NULL
     };
@@ -1783,8 +1878,9 @@ ammonite_window_show_about_dialog (AmmoniteWindow *window)
     dialog = adw_about_dialog_new_from_appdata ("/org/ammonite/ammonite/appdata", NULL);
 
     adw_about_dialog_set_version (ADW_ABOUT_DIALOG (dialog), VERSION);
+    adw_about_dialog_set_support_url (ADW_ABOUT_DIALOG (dialog), "https://x.com/rwdcameron");
     adw_about_dialog_set_debug_info (ADW_ABOUT_DIALOG (dialog), debug_info);
-    adw_about_dialog_set_copyright (ADW_ABOUT_DIALOG (dialog), "© 1999 The Files Authors");
+    adw_about_dialog_set_copyright (ADW_ABOUT_DIALOG (dialog), "© 2026 Ross WD Cameron, © 1999 The Nautilus Authors");
     adw_about_dialog_set_developers (ADW_ABOUT_DIALOG (dialog), developers);
     adw_about_dialog_set_designers (ADW_ABOUT_DIALOG (dialog), designers);
     adw_about_dialog_set_documenters (ADW_ABOUT_DIALOG (dialog), documenters);

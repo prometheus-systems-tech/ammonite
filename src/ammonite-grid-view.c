@@ -1,5 +1,6 @@
 /*
  * SPDX-FileCopyrightText: 2022 The GNOME project contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -144,7 +145,7 @@ get_icon_size_for_zoom_level (AmmoniteGridZoomLevel zoom_level)
 }
 
 static gint
-get_default_zoom_level (void)
+get_default_zoom_level (AmmoniteGridView *self)
 {
     int default_zoom_level = g_settings_get_enum (ammonite_icon_view_preferences,
                                                   AMMONITE_PREFERENCES_ICON_VIEW_DEFAULT_ZOOM_LEVEL);
@@ -192,8 +193,10 @@ real_set_zoom_level (AmmoniteListBase *list_base,
 {
     AmmoniteGridView *self = AMMONITE_GRID_VIEW (list_base);
 
-    g_return_if_fail (new_level >= grid_view_info.zoom_level_min &&
-                      new_level <= grid_view_info.zoom_level_max);
+    AmmoniteViewInfo info = real_get_view_info (list_base);
+
+    g_return_if_fail (new_level >= info.zoom_level_min &&
+                      new_level <= info.zoom_level_max);
 
     self->zoom_level = new_level;
 
@@ -417,6 +420,7 @@ bind_cell (GtkSignalListItemFactory *factory,
 
     g_return_if_fail (item != NULL);
 
+    AmmoniteGridView *self = AMMONITE_GRID_VIEW (user_data);
     GtkWidget *cell = gtk_list_item_get_child (listitem);
     GtkWidget *parent = gtk_widget_get_parent (cell);
 
@@ -451,12 +455,12 @@ setup_cell (GtkSignalListItemFactory *factory,
             gpointer                  user_data)
 {
     AmmoniteGridView *self = AMMONITE_GRID_VIEW (user_data);
-    AmmoniteGridCell *cell;
+    GtkWidget *cell;
     GtkExpression *expression;
 
-    cell = ammonite_grid_cell_new (AMMONITE_LIST_BASE (self), self->caption_attributes);
-    gtk_list_item_set_child (listitem, GTK_WIDGET (cell));
-    setup_cell_common (G_OBJECT (listitem), AMMONITE_VIEW_CELL (cell), GTK_WIDGET (cell));
+    cell = GTK_WIDGET (ammonite_grid_cell_new (AMMONITE_LIST_BASE (self), self->caption_attributes));
+    gtk_list_item_set_child (listitem, cell);
+    setup_cell_common (G_OBJECT (listitem), AMMONITE_VIEW_CELL (cell), cell);
 
     g_object_bind_property (self, "icon-size",
                             cell, "icon-size",
@@ -523,11 +527,22 @@ create_view_ui (AmmoniteGridView *self)
 }
 
 static void
+constructed (GObject *object)
+{
+    AmmoniteGridView *self = AMMONITE_GRID_VIEW (object);
+
+    G_OBJECT_CLASS (ammonite_grid_view_parent_class)->constructed (object);
+
+    ammonite_list_base_set_zoom_level (AMMONITE_LIST_BASE (self), get_default_zoom_level (self));
+}
+
+static void
 ammonite_grid_view_class_init (AmmoniteGridViewClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     AmmoniteListBaseClass *list_base_view_class = AMMONITE_LIST_BASE_CLASS (klass);
 
+    object_class->constructed = constructed;
     object_class->dispose = dispose;
     object_class->finalize = finalize;
 
@@ -571,8 +586,6 @@ ammonite_grid_view_init (AmmoniteGridView *self)
                              G_CALLBACK (update_sort_directories_first),
                              self,
                              G_CONNECT_SWAPPED);
-
-    ammonite_list_base_set_zoom_level (AMMONITE_LIST_BASE (self), get_default_zoom_level ());
 }
 
 AmmoniteGridView *

@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
 set -e
 
 # Usage: create_release.sh [optional next version]

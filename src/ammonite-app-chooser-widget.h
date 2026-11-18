@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2004 Novell, Inc.
  * SPDX-FileCopyrightText: 2007, 2010 Red Hat, Inc.
  * SPDX-FileCopyrightText: 2026 GNOME Files Contributors
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  *

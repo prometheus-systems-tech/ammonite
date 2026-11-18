@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+ */
+
 #include <src/ammonite-file-utilities.h>
 #include <src/ammonite-global-preferences.h>
 #include <src/ammonite-localsearch-utilities.h>

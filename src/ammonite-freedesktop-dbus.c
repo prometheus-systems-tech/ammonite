@@ -2,6 +2,7 @@
  * ammonite-freedesktop-dbus: Implementation for the org.freedesktop DBus file-management interfaces
  *
  * SPDX-FileCopyrightText: 2011 Federico Mena Quintero <federico@gnome.org>
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *

@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
+
 test_env = [
   'GTK_A11Y=none',
   'GSK_DEBUG=fallback',

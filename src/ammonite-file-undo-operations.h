@@ -2,6 +2,7 @@
 /*
  * SPDX-FileCopyrightText: 2007-2011 Amos Brocco
  * SPDX-FileCopyrightText: 2010 Red Hat, Inc.
+ * SPDX-FileCopyrightText: 2026 Ross WD Cameron <rwd.cameron@prometheus-systems.co.za>
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
